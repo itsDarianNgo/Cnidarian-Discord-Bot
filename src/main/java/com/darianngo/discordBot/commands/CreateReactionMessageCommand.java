@@ -1,28 +1,22 @@
 package com.darianngo.discordBot.commands;
 
-import net.dv8tion.jda.api.entities.ChannelType;
-import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
-import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
-public class CreateReactionMessageCommand extends ListenerAdapter {
+public class CreateReactionMessageCommand {
 
-    @Override
-    public void onMessageReceived(MessageReceivedEvent event) {
-        if (event.isFromType(ChannelType.TEXT) && !event.getAuthor().isBot()) {
-        	
-            String[] messageParts = event.getMessage().getContentDisplay().split("\\s+");
-            
-            if (messageParts.length >= 2 && messageParts[0].equalsIgnoreCase("!createReactionMessage")) {
-                String messageContent = String.join(" ", java.util.Arrays.copyOfRange(messageParts, 1, messageParts.length));
-
-                event.getChannel().sendMessage(messageContent).queue((Message message) -> {
-                    // Add reactions to the message here:
-                    message.addReaction("👍").queue();
-                    message.addReaction("👎").queue();
-                    
-                });
-            }
+    public static void createReactionMessage(MessageReceivedEvent event, String content) {
+        String channelId = event.getChannel().getId();
+        if (MonitorChannelCommand.isChannelMonitored(channelId)) {
+            EmbedBuilder builder = new EmbedBuilder();
+            builder.setDescription(content);
+            event.getChannel().sendMessage(builder.build()).queue(message -> {
+                // Add reactions to the message here:
+                message.addReaction("👍").queue();
+                message.addReaction("👎").queue();
+            });
+        } else {
+            event.getChannel().sendMessage("This channel is not being monitored. Use !monitorChannel to start monitoring.").queue();
         }
     }
 }
