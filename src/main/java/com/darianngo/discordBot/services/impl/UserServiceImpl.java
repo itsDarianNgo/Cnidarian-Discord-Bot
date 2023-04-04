@@ -24,4 +24,25 @@ public class UserServiceImpl implements UserService {
         UserEntity savedUser = userRepository.save(user);
         return userMapper.toDto(savedUser);
     }
+
+    @Override
+    public UserDTO getUserById(String id) {
+        UserEntity userEntity = userRepository.findById(id).orElse(null);
+        return userEntity != null ? userMapper.toDto(userEntity) : null;
+    }
+
+    @Override
+    public UserDTO setRanking(String id, int ranking, String name) {
+        UserEntity userEntity = userRepository.findById(id).orElse(null);
+
+        if (userEntity == null) {
+            UserDTO newUserDTO = new UserDTO(id, name, ranking);
+            UserEntity newUser = userRepository.save(userMapper.toEntity(newUserDTO));
+            return userMapper.toDto(newUser);
+        } else {
+            userEntity.setRanking(ranking);
+            UserEntity updatedUser = userRepository.save(userEntity);
+            return userMapper.toDto(updatedUser);
+        }
+    }
 }

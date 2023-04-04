@@ -5,11 +5,12 @@ import jakarta.persistence.Id;
 import lombok.Data;
 import lombok.Setter;
 
-@Setter
 @Data
 @Entity
 public class UserEntity {
-	@Id
-	private String id;
-	private String name;
+    @Id
+    private String id;
+    private String name;
+    private Integer ranking;
 }
+
