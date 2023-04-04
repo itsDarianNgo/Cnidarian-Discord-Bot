@@ -56,7 +56,7 @@ public class MessageReactionListener extends ListenerAdapter {
 		}
 	}
 
-//		When "👍" reaction is added, checks if message was created by bot and if there are 11 "👍" reactions. 
+//		When "👍" reaction is added, checks if message was created by bot and if there are 10 "👍" reactions. 
 //		If both true, sends message with list of users
 	@Override
 	public void onMessageReactionAdd(@Nonnull MessageReactionAddEvent event) {
