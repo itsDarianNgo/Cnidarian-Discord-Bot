@@ -75,7 +75,7 @@ public class MessageReactionListener extends ListenerAdapter {
 				int realUsersCount = reactionCount - 1;
 
 				// Check if the number of real users who reacted is 10 or less
-				if (realUsersCount == 4) {
+				if (realUsersCount == 10) {
 					balanceTeams(event, message);
 				}
 			});
@@ -106,7 +106,7 @@ public class MessageReactionListener extends ListenerAdapter {
 			e.printStackTrace();
 		}
 
-		if (usersReacted.size() == 4) {
+		if (usersReacted.size() == 10) {
 			// Sort users based on their rank
 			Collections.sort(usersReacted, Comparator.comparingInt(UserDTO::getRanking).reversed());
 
