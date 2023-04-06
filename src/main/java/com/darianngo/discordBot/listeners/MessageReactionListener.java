@@ -1,5 +1,6 @@
 package com.darianngo.discordBot.listeners;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -18,6 +19,7 @@ import com.darianngo.discordBot.commands.SetUserRankingCommand;
 import com.darianngo.discordBot.commands.SetUserRolesCommand;
 import com.darianngo.discordBot.dtos.UserDTO;
 import com.darianngo.discordBot.services.UserService;
+import com.darianngo.discordBot.util.TournamentCodeCreator;
 
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageReaction;
@@ -30,7 +32,6 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 public class MessageReactionListener extends ListenerAdapter {
 
 	private final UserService userService;
-	private static final List<String> validRoles = Arrays.asList("top", "jungle", "mid", "adc", "support");
 
 	public MessageReactionListener(UserService userService) {
 		this.userService = userService;
@@ -160,13 +161,25 @@ public class MessageReactionListener extends ListenerAdapter {
 			}
 
 			event.getChannel().sendMessage(response.toString()).queue();
+
+			// Create a custom game
+			try {
+				TournamentCodeCreator tournamentCodeCreator = new TournamentCodeCreator();
+				String tournamentCode = tournamentCodeCreator.createTournamentCode(usersReacted);
+				event.getChannel().sendMessage("Tournament code: " + tournamentCode).queue();
+			} catch (IOException e) {
+				e.printStackTrace();
+				event.getChannel().sendMessage("Error creating the custom game.").queue();
+			}
 		} else {
 			System.out.println(usersReacted);
 			event.getChannel().sendMessage("Not enough users with ranking information.").queue();
 
 		}
 	}
+
 // Helper methods
+
 	private boolean isValidRoleForTeam(String role, List<UserDTO> team) {
 		return team.stream().noneMatch(u -> u.getPrimaryRole().equals(role) || u.getSecondaryRole().equals(role)
 				|| u.getTertiaryRole().equals(role));
