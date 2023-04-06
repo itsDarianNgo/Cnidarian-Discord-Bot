@@ -5,13 +5,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 
 import javax.annotation.Nonnull;
 
 import org.springframework.stereotype.Component;
 
-import com.darianngo.discordBot.commands.CreateReactionMessageCommand;
+import com.darianngo.discordBot.commands.CreateCustomGameCommand;
 import com.darianngo.discordBot.commands.MonitorChannelCommand;
 import com.darianngo.discordBot.commands.SetUserRankingCommand;
 import com.darianngo.discordBot.commands.SetUserRolesCommand;
@@ -41,23 +42,21 @@ public class MessageReactionListener extends ListenerAdapter {
 			return;
 		}
 
-		String messageContent = event.getMessage().getContentRaw();
+		String messageContent = event.getMessage().getContentRaw().toLowerCase(Locale.ROOT);
 		if (messageContent.startsWith("!monitor")) {
 			MonitorChannelCommand.monitorChannel(event);
-		} else if (messageContent.startsWith("!createReactionMessage")) {
-			String content = messageContent.substring("!createReactionMessage".length()).trim();
-			CreateReactionMessageCommand.createReactionMessage(event, content);
-		} else if (messageContent.startsWith("!setRanking")) {
-			String content = messageContent.substring("!setRanking".length()).trim();
+		} else if (messageContent.startsWith("!createcustomgame")) {
+			String content = messageContent.substring("!createcustomgame".length()).trim();
+			CreateCustomGameCommand.createCustomGame(event, content);
+		} else if (messageContent.startsWith("!setranking")) {
+			String content = messageContent.substring("!setranking".length()).trim();
 			SetUserRankingCommand.setUserRanking(event, userService, content);
-		} else if (messageContent.startsWith("!setRoles")) {
-			String content = messageContent.substring("!setRoles".length()).trim();
+		} else if (messageContent.startsWith("!setroles")) {
+			String content = messageContent.substring("!setroles".length()).trim();
 			SetUserRolesCommand.setUserRoles(event, userService, content);
 		}
 	}
 
-//		When "👍" reaction is added, checks if message was created by bot and if there are 10 "👍" reactions. 
-//		If both true, sends message with list of users
 	@Override
 	public void onMessageReactionAdd(@Nonnull MessageReactionAddEvent event) {
 		if (event.getUser().isBot()) {
@@ -66,9 +65,11 @@ public class MessageReactionListener extends ListenerAdapter {
 
 		String channelId = event.getChannel().getId();
 
-		if (MonitorChannelCommand.isChannelMonitored(channelId)) {
-			event.getTextChannel().retrieveMessageById(event.getMessageId()).queue(message -> {
-				int reactionCount = message.getReactions().stream().mapToInt(MessageReaction::getCount).sum();
+	    if (MonitorChannelCommand.isChannelMonitored(channelId)) {
+	        event.getTextChannel().retrieveMessageById(event.getMessageId()).queue(message -> {
+	            int reactionCount = message.getReactions().stream()
+	                    .filter(r -> r.getReactionEmote().getEmoji().equals("👍"))
+	                    .mapToInt(MessageReaction::getCount).sum();
 
 				// Subtract 1 from the reactionCount to exclude the bot
 				int realUsersCount = reactionCount - 1;
@@ -86,17 +87,17 @@ public class MessageReactionListener extends ListenerAdapter {
 		CountDownLatch latch = new CountDownLatch(message.getReactions().size());
 
 		for (MessageReaction reaction : message.getReactions()) {
-			reaction.retrieveUsers().queue(users -> {
-				for (User user : users) {
-					if (!user.isBot()) {
-						UserDTO userDTO = userService.getUserById(user.getId());
-						if (userDTO != null) {
-							usersReacted.add(userDTO);
-						}
-					}
-				}
-				latch.countDown();
-			});
+		    reaction.retrieveUsers().queue(users -> {
+		        for (User user : users) {
+		            if (!user.isBot() && reaction.getReactionEmote().getEmoji().equals("👍")) {
+		                UserDTO userDTO = userService.getUserById(user.getId());
+		                if (userDTO != null) {
+		                    usersReacted.add(userDTO);
+		                }
+		            }
+		        }
+		        latch.countDown();
+		    });
 		}
 
 		try {
@@ -162,6 +163,7 @@ public class MessageReactionListener extends ListenerAdapter {
 
 			event.getChannel().sendMessage(response.toString()).queue();
 		} else {
+			System.out.println(usersReacted);
 			event.getChannel().sendMessage("Not enough users with ranking information.").queue();
 		}
 	}
