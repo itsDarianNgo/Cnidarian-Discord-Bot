@@ -65,17 +65,17 @@ public class MessageReactionListener extends ListenerAdapter {
 
 		String channelId = event.getChannel().getId();
 
-	    if (MonitorChannelCommand.isChannelMonitored(channelId)) {
-	        event.getTextChannel().retrieveMessageById(event.getMessageId()).queue(message -> {
-	            int reactionCount = message.getReactions().stream()
-	                    .filter(r -> r.getReactionEmote().getEmoji().equals("👍"))
-	                    .mapToInt(MessageReaction::getCount).sum();
+		if (MonitorChannelCommand.isChannelMonitored(channelId)) {
+			event.getTextChannel().retrieveMessageById(event.getMessageId()).queue(message -> {
+				int reactionCount = message.getReactions().stream()
+						.filter(r -> r.getReactionEmote().getEmoji().equals("👍")).mapToInt(MessageReaction::getCount)
+						.sum();
 
 				// Subtract 1 from the reactionCount to exclude the bot
 				int realUsersCount = reactionCount - 1;
 
 				// Check if the number of real users who reacted is 10 or less
-				if (realUsersCount == 10) {
+				if (realUsersCount == 4) {
 					balanceTeams(event, message);
 				}
 			});
@@ -87,17 +87,17 @@ public class MessageReactionListener extends ListenerAdapter {
 		CountDownLatch latch = new CountDownLatch(message.getReactions().size());
 
 		for (MessageReaction reaction : message.getReactions()) {
-		    reaction.retrieveUsers().queue(users -> {
-		        for (User user : users) {
-		            if (!user.isBot() && reaction.getReactionEmote().getEmoji().equals("👍")) {
-		                UserDTO userDTO = userService.getUserById(user.getId());
-		                if (userDTO != null) {
-		                    usersReacted.add(userDTO);
-		                }
-		            }
-		        }
-		        latch.countDown();
-		    });
+			reaction.retrieveUsers().queue(users -> {
+				for (User user : users) {
+					if (!user.isBot() && reaction.getReactionEmote().getEmoji().equals("👍")) {
+						UserDTO userDTO = userService.getUserById(user.getId());
+						if (userDTO != null) {
+							usersReacted.add(userDTO);
+						}
+					}
+				}
+				latch.countDown();
+			});
 		}
 
 		try {
@@ -106,7 +106,7 @@ public class MessageReactionListener extends ListenerAdapter {
 			e.printStackTrace();
 		}
 
-		if (usersReacted.size() == 10) {
+		if (usersReacted.size() == 4) {
 			// Sort users based on their rank
 			Collections.sort(usersReacted, Comparator.comparingInt(UserDTO::getRanking).reversed());
 
@@ -114,39 +114,37 @@ public class MessageReactionListener extends ListenerAdapter {
 			List<UserDTO> team2 = new ArrayList<>();
 
 			// Distribute players based on their roles and ranking
-			for (String role : validRoles) {
-				for (UserDTO userDTO : usersReacted) {
-					if (userDTO.getPrimaryRole().equals(role) || userDTO.getSecondaryRole().equals(role)
-							|| userDTO.getTertiaryRole().equals(role)) {
-						int team1RoleCount = (int) team1
-								.stream().filter(u -> u.getPrimaryRole().equals(role)
-										|| u.getSecondaryRole().equals(role) || u.getTertiaryRole().equals(role))
-								.count();
-						int team2RoleCount = (int) team2
-								.stream().filter(u -> u.getPrimaryRole().equals(role)
-										|| u.getSecondaryRole().equals(role) || u.getTertiaryRole().equals(role))
-								.count();
+			for (UserDTO user : usersReacted) {
+				List<String> userRoles = Arrays.asList(user.getPrimaryRole(), user.getSecondaryRole(),
+						user.getTertiaryRole());
+				int team1Score = calculateTeamScore(team1);
+				int team2Score = calculateTeamScore(team2);
 
-						if (team1RoleCount < team2RoleCount) {
-							if (!team1.contains(userDTO)) {
-								team1.add(userDTO);
+				boolean addedToTeam = false;
+				for (String role : userRoles) {
+					if (!addedToTeam) {
+						if (isValidRoleForTeam(role, team1)) {
+							if (team1Score <= team2Score) {
+								team1.add(user);
+								addedToTeam = true;
 							}
-						} else {
-							if (!team2.contains(userDTO)) {
-								team2.add(userDTO);
+						}
+						if (!addedToTeam && isValidRoleForTeam(role, team2)) {
+							if (team2Score <= team1Score) {
+								team2.add(user);
+								addedToTeam = true;
 							}
 						}
 					}
 				}
-			}
 
-			// Fill the remaining spots
-			for (UserDTO userDTO : usersReacted) {
-				if (!team1.contains(userDTO) && !team2.contains(userDTO)) {
-					if (team1.size() < team2.size()) {
-						team1.add(userDTO);
+				if (!addedToTeam) {
+					// If user can't fit in their preferred roles, add to the team with the lowest
+					// score
+					if (team1Score <= team2Score) {
+						team1.add(user);
 					} else {
-						team2.add(userDTO);
+						team2.add(user);
 					}
 				}
 			}
@@ -165,6 +163,16 @@ public class MessageReactionListener extends ListenerAdapter {
 		} else {
 			System.out.println(usersReacted);
 			event.getChannel().sendMessage("Not enough users with ranking information.").queue();
+
 		}
+	}
+// Helper methods
+	private boolean isValidRoleForTeam(String role, List<UserDTO> team) {
+		return team.stream().noneMatch(u -> u.getPrimaryRole().equals(role) || u.getSecondaryRole().equals(role)
+				|| u.getTertiaryRole().equals(role));
+	}
+
+	private int calculateTeamScore(List<UserDTO> team) {
+		return team.stream().mapToInt(UserDTO::getRanking).sum();
 	}
 }
