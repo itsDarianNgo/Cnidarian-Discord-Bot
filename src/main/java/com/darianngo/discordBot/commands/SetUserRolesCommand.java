@@ -7,12 +7,17 @@ import java.util.Locale;
 import com.darianngo.discordBot.dtos.UserDTO;
 import com.darianngo.discordBot.services.UserService;
 
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 
 public class SetUserRolesCommand {
     private static final List<String> validRoles = Arrays.asList("top", "mid", "jungle", "adc", "support");
 
     public static void setUserRoles(MessageReceivedEvent event, UserService userService, String content) {
+        if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
+            event.getChannel().sendMessage("You do not have permission to use this command.").queue();
+            return;
+        }
         String[] parts = content.split(" ");
         if (parts.length == 4) {
             String userId = parts[0];
