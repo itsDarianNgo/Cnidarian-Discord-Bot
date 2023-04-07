@@ -18,6 +18,7 @@ import com.darianngo.discordBot.commands.MonitorChannelCommand;
 import com.darianngo.discordBot.commands.SetUserRankingCommand;
 import com.darianngo.discordBot.commands.SetUserRolesCommand;
 import com.darianngo.discordBot.dtos.UserDTO;
+import com.darianngo.discordBot.riotapi.TournamentAPI;
 import com.darianngo.discordBot.services.UserService;
 import com.darianngo.discordBot.util.TournamentCodeCreator;
 
@@ -164,7 +165,7 @@ public class MessageReactionListener extends ListenerAdapter {
 
 			// Create a custom game
 			try {
-				TournamentCodeCreator tournamentCodeCreator = new TournamentCodeCreator();
+				TournamentAPI tournamentCodeCreator = new TournamentAPI();
 				String tournamentCode = tournamentCodeCreator.createTournamentCode(usersReacted);
 				event.getChannel().sendMessage("Tournament code: " + tournamentCode).queue();
 			} catch (IOException e) {
