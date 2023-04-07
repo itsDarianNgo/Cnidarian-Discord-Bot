@@ -1,6 +1,5 @@
 package com.darianngo.discordBot.listeners;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -18,9 +17,7 @@ import com.darianngo.discordBot.commands.MonitorChannelCommand;
 import com.darianngo.discordBot.commands.SetUserRankingCommand;
 import com.darianngo.discordBot.commands.SetUserRolesCommand;
 import com.darianngo.discordBot.dtos.UserDTO;
-import com.darianngo.discordBot.riotapi.TournamentAPI;
 import com.darianngo.discordBot.services.UserService;
-import com.darianngo.discordBot.util.TournamentCodeCreator;
 
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageReaction;
@@ -72,7 +69,6 @@ public class MessageReactionListener extends ListenerAdapter {
 				int reactionCount = message.getReactions().stream()
 						.filter(r -> r.getReactionEmote().getEmoji().equals("👍")).mapToInt(MessageReaction::getCount)
 						.sum();
-
 				// Subtract 1 from the reactionCount to exclude the bot
 				int realUsersCount = reactionCount - 1;
 
@@ -117,8 +113,7 @@ public class MessageReactionListener extends ListenerAdapter {
 
 			// Distribute players based on their roles and ranking
 			for (UserDTO user : usersReacted) {
-				List<String> userRoles = Arrays.asList(user.getPrimaryRole(), user.getSecondaryRole(),
-						user.getTertiaryRole());
+				List<String> userRoles = Arrays.asList(user.getMainRole(), user.getSecondaryRole());
 				int team1Score = calculateTeamScore(team1);
 				int team2Score = calculateTeamScore(team2);
 
@@ -154,36 +149,35 @@ public class MessageReactionListener extends ListenerAdapter {
 			// Build and send the response
 			StringBuilder response = new StringBuilder("Balanced teams:\n\nTeam 1:\n");
 			for (UserDTO userDTO : team1) {
-				response.append(userDTO.getName()).append(" (").append(userDTO.getRanking()).append(")\n");
+				response.append(userDTO.getDiscordName()).append(" (").append(userDTO.getRanking()).append(")\n");
 			}
 			response.append("\nTeam 2:\n");
 			for (UserDTO userDTO : team2) {
-				response.append(userDTO.getName()).append(" (").append(userDTO.getRanking()).append(")\n");
+				response.append(userDTO.getDiscordName()).append(" (").append(userDTO.getRanking()).append(")\n");
 			}
 
 			event.getChannel().sendMessage(response.toString()).queue();
 
-			// Create a custom game
-			try {
-				TournamentAPI tournamentCodeCreator = new TournamentAPI();
-				String tournamentCode = tournamentCodeCreator.createTournamentCode(usersReacted);
-				event.getChannel().sendMessage("Tournament code: " + tournamentCode).queue();
-			} catch (IOException e) {
-				e.printStackTrace();
-				event.getChannel().sendMessage("Error creating the custom game.").queue();
-			}
-		} else {
-			System.out.println(usersReacted);
-			event.getChannel().sendMessage("Not enough users with ranking information.").queue();
-
+//			// Create a custom game
+//
+//			try {
+//				TournamentAPI tournamentCodeCreator = new TournamentAPI();
+//				String tournamentCode = tournamentCodeCreator.createTournamentCode(usersReacted);
+//				event.getChannel().sendMessage("Tournament code: " + tournamentCode).queue();
+//			} catch (IOException e) {
+//				e.printStackTrace();
+//				event.getChannel().sendMessage("Error creating the custom game.").queue();
+//			}
+//		} else {
+//			System.out.println(usersReacted);
+//			event.getChannel().sendMessage("Not enough users with ranking information.").queue();
 		}
 	}
 
-// Helper methods
+	// Helper methods
 
 	private boolean isValidRoleForTeam(String role, List<UserDTO> team) {
-		return team.stream().noneMatch(u -> u.getPrimaryRole().equals(role) || u.getSecondaryRole().equals(role)
-				|| u.getTertiaryRole().equals(role));
+		return team.stream().noneMatch(u -> u.getMainRole().equals(role) || u.getSecondaryRole().equals(role));
 	}
 
 	private int calculateTeamScore(List<UserDTO> team) {
