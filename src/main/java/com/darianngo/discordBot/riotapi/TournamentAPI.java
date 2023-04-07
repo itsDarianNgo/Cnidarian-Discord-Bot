@@ -1,4 +1,4 @@
-package com.darianngo.discordBot.util;
+package com.darianngo.discordBot.riotapi;
 
 import java.io.IOException;
 import java.util.List;
@@ -15,7 +15,7 @@ import com.darianngo.discordBot.config.RiotApiConfig;
 import com.darianngo.discordBot.dtos.UserDTO;
 import com.google.gson.JsonObject;
 
-public class TournamentCodeCreator {
+public class TournamentAPI {
 
 	public String createTournamentCode(List<UserDTO> users) throws IOException {
 		String url = "https://americas.api.riotgames.com/lol/tournament-stub/v4/codes";
