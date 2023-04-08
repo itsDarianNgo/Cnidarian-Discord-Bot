@@ -27,7 +27,7 @@ public class SetUserRolesCommand {
             if (validRoles.contains(mainRole) && validRoles.contains(secondaryRole)) {
                 event.getJDA().retrieveUserById(userId).queue(user -> {
                     if (user != null) {
-                        UserDTO updatedUser = userService.setRoles(userId, mainRole, secondaryRole, user.getName());
+                        UserDTO updatedUser = userService.setRoles(userId, mainRole, secondaryRole, user.getName(), null);
                         if (updatedUser != null) {
                             String userName = updatedUser.getDiscordName();
                             event.getChannel().sendMessage("User " + userName + " roles updated successfully!").queue();

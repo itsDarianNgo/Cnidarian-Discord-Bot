@@ -7,7 +7,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
 
+import com.darianngo.discordBot.commands.SetupLoLProfileCommand;
 import com.darianngo.discordBot.listeners.MessageReactionListener;
+import com.darianngo.discordBot.listeners.SlashCommandListener;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -19,10 +21,18 @@ public class JdaConfig {
     private String token;
 
     @Bean
-    public JDA jda(MessageReactionListener messageReactionListener) throws LoginException, InterruptedException {
-        return JDABuilder.createDefault(token)
-                .addEventListeners(messageReactionListener)
+    public JDA jda(MessageReactionListener messageReactionListener, SlashCommandListener slashCommandListener) throws LoginException, InterruptedException {
+        JDA jda = JDABuilder.createDefault(token)
+                .addEventListeners(messageReactionListener, slashCommandListener)
                 .build()
                 .awaitReady();
+
+        registerSlashCommands(jda);
+
+        return jda;
+    }
+
+    private void registerSlashCommands(JDA jda) {
+        jda.upsertCommand(SetupLoLProfileCommand.COMMAND_DATA).queue();
     }
 }
