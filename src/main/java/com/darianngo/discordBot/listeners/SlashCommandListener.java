@@ -3,6 +3,7 @@ package com.darianngo.discordBot.listeners;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
+import com.darianngo.discordBot.commands.CreateCustomGameCommand;
 import com.darianngo.discordBot.commands.SetupLoLProfileCommand;
 import com.darianngo.discordBot.commands.ShowLoLProfileCommand; // Add the import
 import com.darianngo.discordBot.services.UserService;
@@ -15,11 +16,13 @@ public class SlashCommandListener extends ListenerAdapter {
 	private final UserService userService;
 	private final SetupLoLProfileCommand setupLoLProfileCommand;
 	private final ShowLoLProfileCommand showLoLProfileCommand;
+	private final CreateCustomGameCommand createCustomGameCommand;
 
 	public SlashCommandListener(UserService userService) {
 		this.userService = userService;
 		this.setupLoLProfileCommand = new SetupLoLProfileCommand(userService);
 		this.showLoLProfileCommand = new ShowLoLProfileCommand(userService);
+		this.createCustomGameCommand = new CreateCustomGameCommand();
 	}
 
 	@Override
@@ -28,6 +31,8 @@ public class SlashCommandListener extends ListenerAdapter {
 			setupLoLProfileCommand.execute(event);
 		} else if (event.getName().equals("show_lol_profile")) {
 			showLoLProfileCommand.execute(event);
+		} else if (event.getName().equals("create_custom_game")) {
+			createCustomGameCommand.execute(event);
 		} else {
 			event.reply("Unknown command.").queue();
 		}

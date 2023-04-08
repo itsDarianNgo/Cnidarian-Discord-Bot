@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
 
+import com.darianngo.discordBot.commands.CreateCustomGameCommand;
 import com.darianngo.discordBot.commands.SetupLoLProfileCommand;
 import com.darianngo.discordBot.commands.ShowLoLProfileCommand;
 import com.darianngo.discordBot.listeners.MessageReactionListener;
@@ -35,5 +36,7 @@ public class JdaConfig {
 	private void registerSlashCommands(JDA jda) {
 		jda.upsertCommand(SetupLoLProfileCommand.COMMAND_DATA).queue();
 		jda.upsertCommand(ShowLoLProfileCommand.COMMAND_DATA).queue();
+		jda.upsertCommand(CreateCustomGameCommand.COMMAND_DATA).queue();
+
 	}
 }

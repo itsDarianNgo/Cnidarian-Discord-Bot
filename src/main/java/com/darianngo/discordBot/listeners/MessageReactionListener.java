@@ -12,7 +12,6 @@ import javax.annotation.Nonnull;
 
 import org.springframework.stereotype.Component;
 
-import com.darianngo.discordBot.commands.CreateCustomGameCommand;
 import com.darianngo.discordBot.commands.MonitorChannelCommand;
 import com.darianngo.discordBot.commands.SetUserRankingCommand;
 import com.darianngo.discordBot.commands.SetUserRolesCommand;
@@ -44,9 +43,6 @@ public class MessageReactionListener extends ListenerAdapter {
 		String messageContent = event.getMessage().getContentRaw().toLowerCase(Locale.ROOT);
 		if (messageContent.startsWith("!monitor")) {
 			MonitorChannelCommand.monitorChannel(event);
-		} else if (messageContent.startsWith("!createcustomgame")) {
-			String content = messageContent.substring("!createcustomgame".length()).trim();
-			CreateCustomGameCommand.createCustomGame(event, content);
 		} else if (messageContent.startsWith("!setranking")) {
 			String content = messageContent.substring("!setranking".length()).trim();
 			SetUserRankingCommand.setUserRanking(event, userService, content);
@@ -149,11 +145,15 @@ public class MessageReactionListener extends ListenerAdapter {
 			// Build and send the response
 			StringBuilder response = new StringBuilder("Balanced teams:\n\nTeam 1:\n");
 			for (UserDTO userDTO : team1) {
-				response.append(userDTO.getDiscordName()).append(" (").append(userDTO.getRanking()).append(")\n");
+				response.append("<@").append(userDTO.getDiscordId()).append("> (").append(userDTO.getRanking())
+						.append(")\n");
+
 			}
 			response.append("\nTeam 2:\n");
 			for (UserDTO userDTO : team2) {
-				response.append(userDTO.getDiscordName()).append(" (").append(userDTO.getRanking()).append(")\n");
+				response.append("<@").append(userDTO.getDiscordId()).append("> (").append(userDTO.getRanking())
+						.append(")\n");
+
 			}
 
 			event.getChannel().sendMessage(response.toString()).queue();
