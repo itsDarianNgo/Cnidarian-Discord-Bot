@@ -12,9 +12,21 @@ public class SetupLoLProfileCommand {
 	public static final CommandData COMMAND_DATA = new CommandData("setup_lol_profile",
 			"Setup your League of Legends profile")
 			.addOptions(new OptionData(OptionType.STRING, "summoner_name", "Your Summoner name", true))
-			.addOptions(new OptionData(OptionType.STRING, "region", "Your region", true))
-			.addOptions(new OptionData(OptionType.STRING, "main_role", "Your main role", true))
-			.addOptions(new OptionData(OptionType.STRING, "secondary_role", "Your secondary role", true));
+			.addOptions(new OptionData(OptionType.STRING, "region", "Your region", true)
+				.addChoice("Europe West", "EUW")
+				.addChoice("North America", "NA"))
+			.addOptions(new OptionData(OptionType.STRING, "main_role", "Your main role", true)
+				.addChoice("TOP", "TOP")
+				.addChoice("JUNGLE", "JUNGLE")
+				.addChoice("MID", "MID")
+				.addChoice("BOT", "BOT")
+				.addChoice("SUPPORT", "SUPPORT"))
+			.addOptions(new OptionData(OptionType.STRING, "secondary_role", "Your secondary role", true)
+				.addChoice("TOP", "TOP")
+				.addChoice("JUNGLE", "JUNGLE")
+				.addChoice("MID", "MID")
+				.addChoice("BOT", "BOT")
+				.addChoice("SUPPORT", "SUPPORT"));
 
 	private final UserService userService;
 
@@ -24,11 +36,16 @@ public class SetupLoLProfileCommand {
 
 	public void execute(SlashCommandEvent event) {
 		String discordId = event.getUser().getId();
-		String discordName = event.getUser().getAsTag().toLowerCase();
-		String summonerName = event.getOption("summoner_name").getAsString().toLowerCase();
-		String region = event.getOption("region").getAsString().toLowerCase();
-		String mainRole = event.getOption("main_role").getAsString().toLowerCase();
-		String secondaryRole = event.getOption("secondary_role").getAsString().toLowerCase();
+		String discordName = event.getUser().getAsTag().toUpperCase();
+		String summonerName = event.getOption("summoner_name").getAsString().toUpperCase();
+		String region = event.getOption("region").getAsString().toUpperCase();
+		String mainRole = event.getOption("main_role").getAsString().toUpperCase();
+		String secondaryRole = event.getOption("secondary_role").getAsString().toUpperCase();
+
+		if (mainRole.equalsIgnoreCase(secondaryRole)) {
+			event.reply("Your main and secondary roles cannot be the same").setEphemeral(true).queue();
+			return;
+		}
 
 		UserDTO existingUser = userService.getUserById(discordId);
 		if (existingUser == null) {
