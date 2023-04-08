@@ -17,6 +17,7 @@ import com.darianngo.discordBot.dtos.UserDTO;
 import com.darianngo.discordBot.services.TeamBalancerService;
 import com.darianngo.discordBot.services.UserService;
 
+import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.MessageReaction;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
@@ -69,7 +70,7 @@ public class MessageReactionListener extends ListenerAdapter {
 				int realUsersCount = reactionCount - 1;
 
 				// Check if the number of real users who reacted is 10 or less
-				if (realUsersCount == 10) {
+				if (realUsersCount == 2) {
 					List<String> reactions = Collections.singletonList("👍");
 					List<UserDTO> usersReacted = new ArrayList<>();
 					CountDownLatch latch = new CountDownLatch(message.getReactions().size());
@@ -98,9 +99,9 @@ public class MessageReactionListener extends ListenerAdapter {
 						e.printStackTrace();
 					}
 
-					if (usersReacted.size() == 10) {
-						String response = teamBalancerService.balanceTeams(reactions, usersReacted);
-						event.getChannel().sendMessage(response).queue();
+					if (usersReacted.size() == 2) {
+					    MessageEmbed embed = teamBalancerService.balanceTeams(reactions, usersReacted);
+					    event.getChannel().sendMessage(embed).queue();
 					} else {
 						System.out.println(usersReacted);
 						event.getChannel().sendMessage("Not enough users with ranking information.").queue();

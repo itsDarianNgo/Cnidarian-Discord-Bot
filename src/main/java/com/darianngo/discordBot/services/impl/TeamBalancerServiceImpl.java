@@ -9,8 +9,11 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.darianngo.discordBot.dtos.UserDTO;
+import com.darianngo.discordBot.embeds.TeamBalancerEmbed;
 import com.darianngo.discordBot.services.TeamBalancerService;
 import com.darianngo.discordBot.services.UserService;
+
+import net.dv8tion.jda.api.entities.MessageEmbed;
 
 @Service
 public class TeamBalancerServiceImpl implements TeamBalancerService {
@@ -22,7 +25,7 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 	}
 
 	@Override
-	public String balanceTeams(List<String> reactions, List<UserDTO> usersReacted) {
+	public MessageEmbed balanceTeams(List<String> reactions, List<UserDTO> usersReacted) {
 		List<UserDTO> team1 = new ArrayList<>();
 		List<UserDTO> team2 = new ArrayList<>();
 
@@ -63,22 +66,9 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 				}
 			}
 		}
-
-		// Build the response
-		StringBuilder response = new StringBuilder("Balanced teams:\n\nTeam 1:\n");
-		for (UserDTO userDTO : team1) {
-			response.append("<@").append(userDTO.getDiscordId()).append("> (").append(userDTO.getRanking())
-					.append(")\n");
-
-		}
-		response.append("\nTeam 2:\n");
-		for (UserDTO userDTO : team2) {
-			response.append("<@").append(userDTO.getDiscordId()).append("> (").append(userDTO.getRanking())
-					.append(")\n");
-
-		}
-
-		return response.toString();
+// Build Embed
+	    int eloDifference = Math.abs(calculateTeamScore(team1) - calculateTeamScore(team2));
+	    return TeamBalancerEmbed.createEmbed(team1, team2, eloDifference);
 	}
 
 	// Create a custom game

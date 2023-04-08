@@ -2,8 +2,10 @@ package com.darianngo.discordBot.services;
 
 import com.darianngo.discordBot.dtos.UserDTO;
 
+import net.dv8tion.jda.api.entities.MessageEmbed;
+
 import java.util.List;
 
 public interface TeamBalancerService {
-    String balanceTeams(List<String> reactions, List<UserDTO> usersReacted);
+	MessageEmbed balanceTeams(List<String> reactions, List<UserDTO> usersReacted);
 }
