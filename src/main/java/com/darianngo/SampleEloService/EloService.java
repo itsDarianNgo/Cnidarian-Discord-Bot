@@ -28,8 +28,16 @@ public class EloService {
 		}
 
 		// Simulate a match and update Elo
-		int matchScore = random.nextBoolean() ? 2 : 1; // Randomly choose a match score of 2-0 or 2-1
+		int matchScore = random.nextBoolean() ? 2 : 1;
 		eloCalculator.updateElo(teamA, teamB, matchScore);
+
+		// Update recent match results
+		for (Player player : teamA) {
+			player.addRecentMatchResult(matchScore == 2 ? 1 : 0);
+		}
+		for (Player player : teamB) {
+			player.addRecentMatchResult(matchScore == 2 ? 0 : 1);
+		}
 
 		// Print results
 		System.out.println("Match Result: " + (matchScore == 2 ? "2-0" : "2-1"));

@@ -1,11 +1,14 @@
 package com.darianngo.SampleEloService;
 
 import java.util.List;
+import java.util.Queue;
 
 import org.apache.commons.math3.distribution.NormalDistribution;
 
 public class BayesianEloCalculator implements EloCalculator {
 	private static final double ELO_STD_DEV = 400;
+	private static final double ELO_CHANGE_FACTOR_MIN = 0.8;
+	private static final double ELO_CHANGE_FACTOR_MAX = 1.2;
 
 	private final MlPredictor mlPredictor;
 	private final NormalDistribution normalDistribution;
@@ -22,17 +25,13 @@ public class BayesianEloCalculator implements EloCalculator {
 		boolean teamAWon = matchScore == 2;
 
 		for (Player player : teamA) {
-//			double predictedOutcomeA = mlPredictor.predictOutcome(teamA, teamB);
 			double expectedOutcomeA = normalDistribution
 					.cumulativeProbability((player.getElo() - teamBRating) / ELO_STD_DEV);
 			double actualOutcomeA = teamAWon ? 1.0 : 0.0;
 
-			// Take into account the individual player's Elo relative to the enemy team's
-			// average Elo
-			double eloChangeFactor = (player.getElo() < teamBRating) ? 1.2 : 0.8;
+			double eloChangeFactor = calculateDynamicEloChangeFactor(player);
 			double eloChange = eloChangeFactor * calculateK(player) * (actualOutcomeA - expectedOutcomeA);
 
-			// Ensure players only gain Elo when their team wins
 			if (teamAWon) {
 				eloChange = Math.max(0, eloChange);
 			} else {
@@ -50,17 +49,13 @@ public class BayesianEloCalculator implements EloCalculator {
 		}
 
 		for (Player player : teamB) {
-//			double predictedOutcomeB = 1 - mlPredictor.predictOutcome(teamA, teamB);
 			double expectedOutcomeB = normalDistribution
 					.cumulativeProbability((player.getElo() - teamARating) / ELO_STD_DEV);
 			double actualOutcomeB = teamAWon ? 0.0 : 1.0;
 
-			// Take into account the individual player's Elo relative to the enemy team's
-			// average Elo
-			double eloChangeFactor = (player.getElo() < teamARating) ? 1.2 : 0.8;
+			double eloChangeFactor = calculateDynamicEloChangeFactor(player);
 			double eloChange = eloChangeFactor * calculateK(player) * (actualOutcomeB - expectedOutcomeB);
 
-			// Ensure players only gain Elo when their team wins
 			if (!teamAWon) {
 				eloChange = Math.max(0, eloChange);
 			} else {
@@ -76,7 +71,15 @@ public class BayesianEloCalculator implements EloCalculator {
 				player.incrementLosses();
 			}
 		}
+	}
 
+	private double calculateDynamicEloChangeFactor(Player player) {
+		Queue<Integer> recentMatchesResults = player.getRecentMatchesResults();
+		int recentWins = (int) recentMatchesResults.stream().filter(result -> result == 1).count();
+		double winRate = recentMatchesResults.isEmpty() ? 0.5 : (double) recentWins / recentMatchesResults.size();
+
+		double eloChangeFactor = ELO_CHANGE_FACTOR_MIN + (winRate * (ELO_CHANGE_FACTOR_MAX - ELO_CHANGE_FACTOR_MIN));
+		return Math.max(ELO_CHANGE_FACTOR_MIN, Math.min(ELO_CHANGE_FACTOR_MAX, eloChangeFactor));
 	}
 
 	private int calculateK(Player player) {
