@@ -12,10 +12,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class UserEntity {
     @Id
-    private String id;
-    private String name;
+    private String discordId;
+    private String discordName;
+    private String summonerName;   
     private Integer ranking;
-    private String primaryRole;
+    private String mainRole;
     private String secondaryRole;
-    private String tertiaryRole;
+    private String region;
 }

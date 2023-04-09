@@ -1,23 +1,37 @@
 package com.darianngo.discordBot.commands;
 
+import java.awt.Color;
+
 import net.dv8tion.jda.api.EmbedBuilder;
-import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.events.interaction.SlashCommandEvent;
+import net.dv8tion.jda.api.interactions.commands.OptionType;
+import net.dv8tion.jda.api.interactions.commands.build.CommandData;
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 
 public class CreateCustomGameCommand {
 
-    public static void createCustomGame(MessageReceivedEvent event, String content) {
-        String channelId = event.getChannel().getId();
-        if (MonitorChannelCommand.isChannelMonitored(channelId)) {
-            EmbedBuilder builder = new EmbedBuilder();
-            builder.setTitle("Custom Game");
-            builder.setDescription(content);
-            event.getChannel().sendMessage(builder.build()).queue(message -> {
-                // Add reactions to the message here:
-                message.addReaction("👍").queue();
-                message.addReaction("👎").queue();
-            });
-        } else {
-            event.getChannel().sendMessage("This channel is not being monitored. Use !monitor to start monitoring.").queue();
-        }
-    }
+	public static final CommandData COMMAND_DATA = new CommandData("create_custom_game", "Create a custom game")
+			.addOptions(new OptionData(OptionType.INTEGER, "time", "Time to play", true).addChoice("1", 1)
+					.addChoice("2", 2).addChoice("3", 3).addChoice("4", 4).addChoice("5", 5).addChoice("6", 6)
+					.addChoice("7", 7).addChoice("8", 8).addChoice("9", 9).addChoice("10", 10).addChoice("11", 11)
+					.addChoice("12", 12))
+			.addOptions(new OptionData(OptionType.STRING, "am_pm", "AM or PM", true).addChoice("AM", "AM")
+					.addChoice("PM", "PM"));
+
+	public void execute(SlashCommandEvent event) {
+	    int timeToPlay = (int) event.getOption("time").getAsLong();
+	    String amPm = event.getOption("am_pm").getAsString();
+	    EmbedBuilder embedBuilder = new EmbedBuilder();
+	    embedBuilder.setTitle("Custom Game");
+	    embedBuilder.setDescription("Time to play: **" + timeToPlay + " " + amPm + "**");
+	    embedBuilder.setColor(Color.BLUE);
+
+	    event.reply("@everyone").addEmbeds(embedBuilder.build()).queue(interactionHook -> {
+	        interactionHook.retrieveOriginal().queue(message -> {
+	            message.addReaction("👍").queue();
+	            message.addReaction("👎").queue();
+	        });
+	    });
+	}
+
 }
