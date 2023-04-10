@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import com.darianngo.discordBot.dtos.UserDTO;
 import com.darianngo.discordBot.embeds.TeamBalancerEmbed;
+import com.darianngo.discordBot.services.MatchService;
 import com.darianngo.discordBot.services.TeamBalancerService;
 import com.darianngo.discordBot.services.UserService;
 
@@ -19,9 +20,11 @@ import net.dv8tion.jda.api.entities.MessageEmbed;
 public class TeamBalancerServiceImpl implements TeamBalancerService {
 
 	private final UserService userService;
+	private final MatchService matchService;
 
-	public TeamBalancerServiceImpl(UserService userService) {
+	public TeamBalancerServiceImpl(UserService userService, MatchService matchService) {
 		this.userService = userService;
+		this.matchService = matchService;
 	}
 
 	@Override
@@ -68,8 +71,11 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 		}
 // Build Embed
 	    int eloDifference = Math.abs(calculateTeamScore(team1) - calculateTeamScore(team2));
-		return TeamBalancerEmbed.createEmbed(team1, team2, eloDifference, matchId);
-	}
+	    // Save teams to the database
+	    matchService.saveTeamsWithMatchId(team1, team2, matchId);
+
+	    return TeamBalancerEmbed.createEmbed(team1, team2, eloDifference, matchId);
+	    }
 
 	// Create a custom game
 	// try {
