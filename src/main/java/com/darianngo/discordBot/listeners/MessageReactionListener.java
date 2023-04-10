@@ -157,8 +157,7 @@ public class MessageReactionListener extends ListenerAdapter {
 					return;
 				}
 
-				if (!approvalEvent.getMember().hasPermission(Permission.ADMINISTRATOR)
-						&& !approvalEvent.getMember().hasPermission(Permission.MANAGE_SERVER)) {
+				if (!approvalEvent.getMember().hasPermission(Permission.MANAGE_SERVER)) {
 					return;
 				}
 
