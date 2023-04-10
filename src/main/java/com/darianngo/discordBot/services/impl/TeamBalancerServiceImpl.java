@@ -25,7 +25,7 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 	}
 
 	@Override
-	public MessageEmbed balanceTeams(List<String> reactions, List<UserDTO> usersReacted) {
+	public MessageEmbed balanceTeams(List<String> reactions, List<UserDTO> usersReacted, Long matchId) {
 		List<UserDTO> team1 = new ArrayList<>();
 		List<UserDTO> team2 = new ArrayList<>();
 
@@ -68,7 +68,7 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 		}
 // Build Embed
 	    int eloDifference = Math.abs(calculateTeamScore(team1) - calculateTeamScore(team2));
-	    return TeamBalancerEmbed.createEmbed(team1, team2, eloDifference);
+		return TeamBalancerEmbed.createEmbed(team1, team2, eloDifference, matchId);
 	}
 
 	// Create a custom game

@@ -14,6 +14,8 @@ import com.darianngo.discordBot.commands.MonitorChannelCommand;
 import com.darianngo.discordBot.commands.SetUserRankingCommand;
 import com.darianngo.discordBot.commands.SetUserRolesCommand;
 import com.darianngo.discordBot.dtos.UserDTO;
+import com.darianngo.discordBot.entities.MatchEntity;
+import com.darianngo.discordBot.services.MatchService;
 import com.darianngo.discordBot.services.TeamBalancerService;
 import com.darianngo.discordBot.services.UserService;
 
@@ -29,10 +31,12 @@ public class MessageReactionListener extends ListenerAdapter {
 
 	private final UserService userService;
 	private final TeamBalancerService teamBalancerService;
+	private final MatchService matchService;
 
-	public MessageReactionListener(UserService userService, TeamBalancerService teamBalancerService) {
+	public MessageReactionListener(UserService userService, TeamBalancerService teamBalancerService, MatchService matchService) {
 		this.userService = userService;
 		this.teamBalancerService = teamBalancerService;
+		this.matchService = matchService;
 	}
 
 	@Override
@@ -100,8 +104,11 @@ public class MessageReactionListener extends ListenerAdapter {
 					}
 
 					if (usersReacted.size() == 2) {
-					    MessageEmbed embed = teamBalancerService.balanceTeams(reactions, usersReacted);
-					    event.getChannel().sendMessage(embed).queue();
+						// Save the match details to the database
+						MatchEntity match = matchService.createMatch();
+						// Pass the match id to the balanceTeams method
+						MessageEmbed embed = teamBalancerService.balanceTeams(reactions, usersReacted, match.getId());
+						event.getChannel().sendMessage(embed).queue();
 					} else {
 						System.out.println(usersReacted);
 						event.getChannel().sendMessage("Not enough users with ranking information.").queue();

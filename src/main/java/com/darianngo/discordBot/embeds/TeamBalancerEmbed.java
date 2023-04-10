@@ -10,7 +10,7 @@ import net.dv8tion.jda.api.entities.MessageEmbed;
 
 public class TeamBalancerEmbed {
 
-	public static MessageEmbed createEmbed(List<UserDTO> team1, List<UserDTO> team2, int eloDifference) {
+	public static MessageEmbed createEmbed(List<UserDTO> team1, List<UserDTO> team2, int eloDifference, Long matchId) {
 		// Randomize team colors
 		Random random = new Random();
 		boolean blueTeamFirst = random.nextBoolean();
@@ -18,7 +18,7 @@ public class TeamBalancerEmbed {
 		// Build the embed
 		EmbedBuilder embedBuilder = new EmbedBuilder();
 		embedBuilder.setTitle("Queue Popped!");
-		embedBuilder.addField("MATCH ID:", "example_match_id", false);
+		embedBuilder.addField("MATCH ID:", matchId.toString(), false);
 		embedBuilder.addField("Elo difference:", String.valueOf(eloDifference), false);
 
 		StringBuilder team1Builder = new StringBuilder();
