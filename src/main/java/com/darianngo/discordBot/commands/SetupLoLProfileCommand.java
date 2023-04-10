@@ -50,7 +50,7 @@ public class SetupLoLProfileCommand {
 
 		UserDTO existingUser = userService.getUserById(discordId);
 	    if (existingUser == null) {
-	        UserDTO newUser = new UserDTO(discordId, discordName, summonerName, null, mainRole, secondaryRole, region);
+	        UserDTO newUser = new UserDTO(discordId, discordName, summonerName, null, mainRole, secondaryRole, region, null, null, null);
 	        userService.createUser(newUser);
 	        event.reply("Your League of Legends profile has been set up.").queue();
 	        event.getChannel().sendMessage(LoLProfileEmbed.createProfileEmbed(newUser, "<@" + discordId + ">")).queue();

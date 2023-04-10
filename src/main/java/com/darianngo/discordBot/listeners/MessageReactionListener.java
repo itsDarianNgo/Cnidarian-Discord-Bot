@@ -16,8 +16,8 @@ import com.darianngo.discordBot.commands.MonitorChannelCommand;
 import com.darianngo.discordBot.commands.SetUserRankingCommand;
 import com.darianngo.discordBot.commands.SetUserRolesCommand;
 import com.darianngo.discordBot.config.DiscordChannelConfig;
+import com.darianngo.discordBot.dtos.MatchDTO;
 import com.darianngo.discordBot.dtos.UserDTO;
-import com.darianngo.discordBot.entities.MatchEntity;
 import com.darianngo.discordBot.services.MatchService;
 import com.darianngo.discordBot.services.TeamBalancerService;
 import com.darianngo.discordBot.services.UserService;
@@ -109,7 +109,6 @@ public class MessageReactionListener extends ListenerAdapter {
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
-
 					sendMatchApprovalRequest(event, usersReacted, approvalRequest -> waitForApproval(event,
 							approvalRequest.getId(), reactions, usersReacted));
 
@@ -147,8 +146,6 @@ public class MessageReactionListener extends ListenerAdapter {
 
 	private void waitForApproval(MessageReactionAddEvent event, String approvalMessageId, List<String> reactions,
 			List<UserDTO> usersReacted) {
-		MatchEntity matchEntity = matchService.createMatch();
-		Long matchId = matchEntity.getId();
 
 		event.getJDA().addEventListener(new ListenerAdapter() {
 			@Override
@@ -162,6 +159,10 @@ public class MessageReactionListener extends ListenerAdapter {
 				}
 
 				if (approvalEvent.getReactionEmote().getEmoji().equals("✅")) {
+					// Create a match when the approval reaction is "✅"
+					MatchDTO match = matchService.createMatch(new MatchDTO());
+					Long matchId = match.getId();
+
 					MessageEmbed embed = teamBalancerService.balanceTeams(reactions, usersReacted, matchId);
 					event.getChannel().sendMessage(embed).queue();
 				} else if (approvalEvent.getReactionEmote().getEmoji().equals("❌")) {

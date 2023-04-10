@@ -1,7 +1,7 @@
 package com.darianngo.discordBot.services;
 
-import com.darianngo.discordBot.entities.MatchEntity;
+import com.darianngo.discordBot.dtos.MatchDTO;
 
 public interface MatchService {
-	MatchEntity createMatch();
+    MatchDTO createMatch(MatchDTO matchDTO);
 }

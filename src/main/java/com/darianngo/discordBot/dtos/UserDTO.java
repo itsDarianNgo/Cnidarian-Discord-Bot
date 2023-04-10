@@ -8,11 +8,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class UserDTO {
-    private String discordId;
-    private String discordName;
-    private String summonerName;
-    private Integer ranking;
-    private String mainRole;
-    private String secondaryRole;
-    private String region;
+	private String discordId;
+	private String discordName;
+	private String summonerName;
+	private Integer ranking;
+	private String mainRole;
+	private String secondaryRole;
+	private String region;
+	private Integer elo;
+	private Integer recentEloChange;
+	private Integer totalMatches;
 }
