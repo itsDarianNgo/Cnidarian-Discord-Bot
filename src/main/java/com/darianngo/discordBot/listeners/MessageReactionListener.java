@@ -5,20 +5,26 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
+import java.util.function.Consumer;
 
 import javax.annotation.Nonnull;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.darianngo.discordBot.commands.MonitorChannelCommand;
 import com.darianngo.discordBot.commands.SetUserRankingCommand;
 import com.darianngo.discordBot.commands.SetUserRolesCommand;
+import com.darianngo.discordBot.config.DiscordChannelConfig;
 import com.darianngo.discordBot.dtos.UserDTO;
 import com.darianngo.discordBot.entities.MatchEntity;
 import com.darianngo.discordBot.services.MatchService;
 import com.darianngo.discordBot.services.TeamBalancerService;
 import com.darianngo.discordBot.services.UserService;
 
+import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.MessageReaction;
 import net.dv8tion.jda.api.entities.User;
@@ -32,8 +38,11 @@ public class MessageReactionListener extends ListenerAdapter {
 	private final UserService userService;
 	private final TeamBalancerService teamBalancerService;
 	private final MatchService matchService;
+	@Autowired
+	private DiscordChannelConfig discordChannelConfig;
 
-	public MessageReactionListener(UserService userService, TeamBalancerService teamBalancerService, MatchService matchService) {
+	public MessageReactionListener(UserService userService, TeamBalancerService teamBalancerService,
+			MatchService matchService) {
 		this.userService = userService;
 		this.teamBalancerService = teamBalancerService;
 		this.matchService = matchService;
@@ -57,7 +66,6 @@ public class MessageReactionListener extends ListenerAdapter {
 		}
 	}
 
-	@Override
 	public void onMessageReactionAdd(@Nonnull MessageReactionAddEvent event) {
 		if (event.getUser().isBot()) {
 			return;
@@ -77,6 +85,7 @@ public class MessageReactionListener extends ListenerAdapter {
 				if (realUsersCount == 2) {
 					List<String> reactions = Collections.singletonList("👍");
 					List<UserDTO> usersReacted = new ArrayList<>();
+
 					CountDownLatch latch = new CountDownLatch(message.getReactions().size());
 
 					for (MessageReaction reaction : message.getReactions()) {
@@ -85,9 +94,7 @@ public class MessageReactionListener extends ListenerAdapter {
 								for (User user : users) {
 									if (!user.isBot()) {
 										UserDTO userDTO = userService.getUserById(user.getId());
-										if (userDTO != null) {
-											usersReacted.add(userDTO);
-										}
+										usersReacted.add(userDTO);
 									}
 								}
 								latch.countDown();
@@ -103,18 +110,68 @@ public class MessageReactionListener extends ListenerAdapter {
 						e.printStackTrace();
 					}
 
-					if (usersReacted.size() == 2) {
-						// Save the match details to the database
-						MatchEntity match = matchService.createMatch();
-						// Pass the match id to the balanceTeams method
-						MessageEmbed embed = teamBalancerService.balanceTeams(reactions, usersReacted, match.getId());
-						event.getChannel().sendMessage(embed).queue();
-					} else {
-						System.out.println(usersReacted);
-						event.getChannel().sendMessage("Not enough users with ranking information.").queue();
-					}
+					sendMatchApprovalRequest(event, usersReacted, approvalRequest -> waitForApproval(event,
+							approvalRequest.getId(), reactions, usersReacted));
+
 				}
 			});
 		}
 	}
+
+	private void sendMatchApprovalRequest(MessageReactionAddEvent event, List<UserDTO> usersReacted,
+			Consumer<Message> callback) {
+		String approvalChannelId = discordChannelConfig.getApprovalChannelId();
+
+		MessageEmbed approvalEmbed = createMatchApprovalEmbed(usersReacted);
+		event.getJDA().getTextChannelById(approvalChannelId).sendMessage(approvalEmbed).queue(message -> {
+			message.addReaction("✅").queue();
+			message.addReaction("❌").queue();
+			callback.accept(message);
+		});
+	}
+
+	private MessageEmbed createMatchApprovalEmbed(List<UserDTO> usersReacted) {
+		EmbedBuilder embedBuilder = new EmbedBuilder();
+		embedBuilder.setTitle("Match Approval Request");
+		embedBuilder.setDescription("React with ✅ to approve or ❌ to reject");
+
+		StringBuilder usersBuilder = new StringBuilder();
+		for (UserDTO userDTO : usersReacted) {
+			usersBuilder.append("<@").append(userDTO.getDiscordId()).append("> (").append(userDTO.getRanking())
+					.append(")\n");
+		}
+		embedBuilder.addField("Users:", usersBuilder.toString(), false);
+
+		return embedBuilder.build();
+	}
+
+	private void waitForApproval(MessageReactionAddEvent event, String approvalMessageId, List<String> reactions,
+			List<UserDTO> usersReacted) {
+		MatchEntity matchEntity = matchService.createMatch();
+		Long matchId = matchEntity.getId();
+
+		event.getJDA().addEventListener(new ListenerAdapter() {
+			@Override
+			public void onMessageReactionAdd(@Nonnull MessageReactionAddEvent approvalEvent) {
+				if (!approvalEvent.getMessageId().equals(approvalMessageId)) {
+					return;
+				}
+
+				if (!approvalEvent.getMember().hasPermission(Permission.ADMINISTRATOR)
+						&& !approvalEvent.getMember().hasPermission(Permission.MANAGE_SERVER)) {
+					return;
+				}
+
+				if (approvalEvent.getReactionEmote().getEmoji().equals("✅")) {
+					MessageEmbed embed = teamBalancerService.balanceTeams(reactions, usersReacted, matchId);
+					event.getChannel().sendMessage(embed).queue();
+				} else if (approvalEvent.getReactionEmote().getEmoji().equals("❌")) {
+					event.getChannel().sendMessage("Match creation request rejected.").queue();
+				}
+
+				event.getJDA().removeEventListener(this);
+			}
+		});
+	}
+
 }
