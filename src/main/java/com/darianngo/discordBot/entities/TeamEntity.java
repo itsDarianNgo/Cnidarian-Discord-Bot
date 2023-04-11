@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -16,11 +17,14 @@ import lombok.NoArgsConstructor;
 @Entity
 @AllArgsConstructor
 @NoArgsConstructor
-public class MatchEntity {
+public class TeamEntity {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
-	@OneToMany(mappedBy = "match", cascade = CascadeType.ALL, orphanRemoval = true)
-	private List<TeamEntity> teams;
+	@ManyToOne
+	private MatchEntity match;
+
+	@OneToMany(mappedBy = "team", cascade = CascadeType.ALL)
+	private List<UserTeamEntity> userTeams;
 }

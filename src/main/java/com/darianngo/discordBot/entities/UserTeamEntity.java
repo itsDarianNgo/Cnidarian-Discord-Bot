@@ -1,13 +1,10 @@
 package com.darianngo.discordBot.entities;
 
-import java.util.List;
-
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
+import jakarta.persistence.ManyToOne;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,11 +13,14 @@ import lombok.NoArgsConstructor;
 @Entity
 @AllArgsConstructor
 @NoArgsConstructor
-public class MatchEntity {
+public class UserTeamEntity {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
-	@OneToMany(mappedBy = "match", cascade = CascadeType.ALL, orphanRemoval = true)
-	private List<TeamEntity> teams;
+	@ManyToOne
+	private UserEntity user;
+
+	@ManyToOne
+	private TeamEntity team;
 }
