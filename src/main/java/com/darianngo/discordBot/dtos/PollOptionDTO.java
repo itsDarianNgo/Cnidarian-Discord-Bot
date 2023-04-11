@@ -1,7 +1,5 @@
 package com.darianngo.discordBot.dtos;
 
-import java.util.List;
-
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -9,10 +7,8 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class MatchDTO {
-    private Long id;
-    private List<TeamDTO> teams;
-    private String winningTeam;
-    private String finalScore;
-
+public class PollOptionDTO {
+	private Long id;
+	private String option;
+	private int voteCount;
 }

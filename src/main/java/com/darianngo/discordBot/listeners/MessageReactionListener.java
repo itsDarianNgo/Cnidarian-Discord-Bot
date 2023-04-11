@@ -4,12 +4,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import javax.annotation.Nonnull;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.crossstore.ChangeSetPersister.NotFoundException;
 import org.springframework.stereotype.Component;
 
 import com.darianngo.discordBot.commands.MonitorChannelCommand;
@@ -109,12 +113,107 @@ public class MessageReactionListener extends ListenerAdapter {
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
+
 					sendMatchApprovalRequest(event, usersReacted, approvalRequest -> waitForApproval(event,
 							approvalRequest.getId(), reactions, usersReacted));
 
 				}
+
 			});
 		}
+	}
+
+	private void createPoll(MessageReactionAddEvent event, List<UserDTO> usersReacted, MatchDTO match,
+			Consumer<MatchDTO> callback) {
+		Long matchId = match.getId();
+		MessageEmbed pollEmbed = createPollEmbed(matchId);
+		event.getChannel().sendMessage(pollEmbed).queue(message -> {
+			message.addReaction("1️⃣").queue();
+			message.addReaction("2️⃣").queue();
+			message.addReaction("🔥").queue();
+			message.addReaction("🌊").queue();
+			callback.accept(match);
+		});
+	}
+
+	private MessageEmbed createPollEmbed(Long matchId) {
+		EmbedBuilder embedBuilder = new EmbedBuilder();
+		embedBuilder.setTitle("Match Result Poll");
+		embedBuilder.setDescription("React with 1️⃣ if Team 1 won and 2️⃣ if Team 2 won");
+		embedBuilder.addField("Match ID", matchId.toString(), false);
+		return embedBuilder.build();
+	}
+
+	private void waitForPollResults(MessageReactionAddEvent event, Long matchId, List<UserDTO> usersReacted) {
+		event.getJDA().addEventListener(new ListenerAdapter() {
+			@Override
+			public void onMessageReactionAdd(@Nonnull MessageReactionAddEvent pollEvent) {
+				if (!event.getUser().isBot() && isUserInMatch(usersReacted, pollEvent.getUserId())) {
+					processPollResults(pollEvent, matchId, usersReacted);
+				}
+			}
+		});
+	}
+
+	private void processPollResults(MessageReactionAddEvent event, Long matchId, List<UserDTO> usersReacted) {
+		List<MessageReaction> reactions = event.getTextChannel().retrieveMessageById(event.getMessageId()).complete()
+				.getReactions();
+
+		AtomicInteger team1Votes = new AtomicInteger();
+		AtomicInteger team2Votes = new AtomicInteger();
+		AtomicReference<String> finalScore = new AtomicReference<>("");
+
+		reactions.forEach(reaction -> {
+			if (reaction.getReactionEmote().getEmoji().equals("1️⃣")) {
+				team1Votes.set(reaction.getCount() - 1);
+			} else if (reaction.getReactionEmote().getEmoji().equals("2️⃣")) {
+				team2Votes.set(reaction.getCount() - 1);
+			} else if (reaction.getReactionEmote().getEmoji().equals("🔥")) {
+				finalScore.set("2-0");
+			} else if (reaction.getReactionEmote().getEmoji().equals("🌊")) {
+				finalScore.set("2-1");
+			}
+		});
+
+		event.getJDA().addEventListener(new ListenerAdapter() {
+			@Override
+			public void onMessageReactionAdd(@Nonnull MessageReactionAddEvent event) {
+				if (event.getUser().isBot()) {
+					return;
+				}
+
+				Optional<String> winningTeam = Optional.empty();
+
+				if (team1Votes.get() >= 1) {
+					winningTeam = Optional.of("Team 1");
+				} else if (team2Votes.get() >= 1) {
+					winningTeam = Optional.of("Team 2");
+				}
+
+				if (winningTeam.isPresent()) {
+					try {
+						updateMatchResults(matchId, winningTeam.get(), finalScore.get());
+					} catch (NotFoundException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					event.getChannel().sendMessage("Poll has ended. " + winningTeam.get()
+							+ " won the match with a score of " + finalScore.get()).queue();
+					event.getJDA().removeEventListener(this); // Remove the listener after processing the poll
+				}
+			}
+		});
+	}
+
+	private void updateMatchResults(Long matchId, String winningTeam, String finalScore) throws NotFoundException {
+		MatchDTO match = matchService.getMatchById(matchId);
+		match.setWinningTeam(winningTeam);
+		match.setFinalScore(finalScore);
+		matchService.updateMatch(match);
+	}
+
+	private boolean isUserInMatch(List<UserDTO> usersReacted, String userId) {
+		return usersReacted.stream().anyMatch(user -> user.getDiscordId().equals(userId));
 	}
 
 	private void sendMatchApprovalRequest(MessageReactionAddEvent event, List<UserDTO> usersReacted,
@@ -165,6 +264,11 @@ public class MessageReactionListener extends ListenerAdapter {
 
 					MessageEmbed embed = teamBalancerService.balanceTeams(reactions, usersReacted, matchId);
 					event.getChannel().sendMessage(embed).queue();
+
+					// Create poll after a match has been created
+					createPoll(event, usersReacted, match, matchResult -> {
+						waitForPollResults(event, matchId, usersReacted);
+					});
 				} else if (approvalEvent.getReactionEmote().getEmoji().equals("❌")) {
 					event.getChannel().sendMessage("Match creation request rejected.").queue();
 				}

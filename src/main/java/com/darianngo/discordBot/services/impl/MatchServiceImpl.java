@@ -1,17 +1,21 @@
 package com.darianngo.discordBot.services.impl;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.darianngo.discordBot.dtos.MatchDTO;
+import com.darianngo.discordBot.dtos.TeamDTO;
 import com.darianngo.discordBot.dtos.UserDTO;
 import com.darianngo.discordBot.entities.MatchEntity;
 import com.darianngo.discordBot.entities.TeamEntity;
 import com.darianngo.discordBot.entities.UserEntity;
 import com.darianngo.discordBot.entities.UserTeamEntity;
 import com.darianngo.discordBot.mappers.MatchMapper;
+import com.darianngo.discordBot.mappers.TeamMapper;
 import com.darianngo.discordBot.repositories.MatchRepository;
 import com.darianngo.discordBot.repositories.TeamRepository;
 import com.darianngo.discordBot.repositories.UserRepository;
@@ -42,6 +46,8 @@ public class MatchServiceImpl implements MatchService {
 
 	@Autowired
 	private TeamRepository teamRepository;
+	@Autowired
+	private TeamMapper teamMapper;
 
 	@Override
 	public void saveTeamsWithMatchId(List<UserDTO> team1, List<UserDTO> team2, Long matchId) {
@@ -74,6 +80,31 @@ public class MatchServiceImpl implements MatchService {
 			userTeamRepository.save(userTeam);
 		}
 
+	}
+
+	@Override
+	public void updateMatch(MatchDTO matchDTO) {
+		MatchEntity match = matchMapper.toEntity(matchDTO);
+		matchRepository.save(match);
+	}
+
+	@Override
+	public MatchDTO getMatchById(Long matchId) {
+		Optional<MatchEntity> matchEntityOptional = matchRepository.findByIdWithTeams(matchId);
+		MatchDTO matchDTO = null;
+
+		if (matchEntityOptional.isPresent()) {
+			MatchEntity matchEntity = matchEntityOptional.get();
+			matchDTO = new MatchDTO();
+			matchDTO.setId(matchEntity.getId());
+			List<TeamDTO> teamDTOs = matchEntity.getTeams().stream().map(teamMapper::toDto)
+					.collect(Collectors.toList());
+			matchDTO.setTeams(teamDTOs);
+			matchDTO.setFinalScore(matchEntity.getFinalScore());
+			matchDTO.setWinningTeam(matchEntity.getWinningTeam());
+		}
+
+		return matchDTO;
 	}
 
 }
