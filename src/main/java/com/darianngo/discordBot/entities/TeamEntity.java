@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import lombok.AllArgsConstructor;
@@ -23,6 +24,7 @@ public class TeamEntity {
 	private Long id;
 
 	@ManyToOne
+	@JoinColumn(name = "match_id")
 	private MatchEntity match;
 
 	@OneToMany(mappedBy = "team", cascade = CascadeType.ALL)

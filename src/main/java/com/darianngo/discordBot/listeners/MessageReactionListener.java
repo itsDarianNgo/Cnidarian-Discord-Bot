@@ -206,11 +206,14 @@ public class MessageReactionListener extends ListenerAdapter {
 	}
 
 	private void updateMatchResults(Long matchId, String winningTeam, String finalScore) throws NotFoundException {
-		MatchDTO match = matchService.getMatchById(matchId);
-		match.setWinningTeam(winningTeam);
-		match.setFinalScore(finalScore);
-		matchService.updateMatch(match);
+	    System.out.println("Updating match results for matchId: " + matchId);
+	    MatchDTO match = matchService.getMatchById(matchId);
+	    match.setWinningTeam(winningTeam);
+	    match.setFinalScore(finalScore);
+	    matchService.updateMatch(match);
+	    System.out.println("Updated match results for matchId: " + matchId + ", winningTeam: " + winningTeam + ", finalScore: " + finalScore);
 	}
+
 
 	private boolean isUserInMatch(List<UserDTO> usersReacted, String userId) {
 		return usersReacted.stream().anyMatch(user -> user.getDiscordId().equals(userId));
