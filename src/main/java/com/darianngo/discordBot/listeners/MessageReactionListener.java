@@ -2,8 +2,10 @@ package com.darianngo.discordBot.listeners;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -23,6 +25,8 @@ import com.darianngo.discordBot.commands.SetUserRolesCommand;
 import com.darianngo.discordBot.config.DiscordChannelConfig;
 import com.darianngo.discordBot.dtos.MatchDTO;
 import com.darianngo.discordBot.dtos.UserDTO;
+import com.darianngo.discordBot.services.DirectMessageService;
+import com.darianngo.discordBot.services.MatchResultService;
 import com.darianngo.discordBot.services.MatchService;
 import com.darianngo.discordBot.services.TeamBalancerService;
 import com.darianngo.discordBot.services.UserService;
@@ -36,6 +40,8 @@ import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.interactions.components.ActionRow;
+import net.dv8tion.jda.api.interactions.components.Button;
 
 @Component
 public class MessageReactionListener extends ListenerAdapter {
@@ -43,14 +49,19 @@ public class MessageReactionListener extends ListenerAdapter {
 	private final UserService userService;
 	private final TeamBalancerService teamBalancerService;
 	private final MatchService matchService;
+	private final MatchResultService matchResultService;
+
+	@Autowired
+	private DirectMessageService directMessageService;
 	@Autowired
 	private DiscordChannelConfig discordChannelConfig;
 
 	public MessageReactionListener(UserService userService, TeamBalancerService teamBalancerService,
-			MatchService matchService) {
+			MatchService matchService, MatchResultService matchResultService) {
 		this.userService = userService;
 		this.teamBalancerService = teamBalancerService;
 		this.matchService = matchService;
+		this.matchResultService = matchResultService;
 	}
 
 	@Override
@@ -87,7 +98,7 @@ public class MessageReactionListener extends ListenerAdapter {
 				int realUsersCount = reactionCount - 1;
 
 				// Check if the number of real users who reacted is 10 or less
-				if (realUsersCount == 4) {
+				if (realUsersCount == 2) {
 					List<String> reactions = Collections.singletonList("👍");
 					List<UserDTO> usersReacted = new ArrayList<>();
 
@@ -260,6 +271,23 @@ public class MessageReactionListener extends ListenerAdapter {
 		return embedBuilder.build();
 	}
 
+	private Map<Long, List<User>> matchIdToUsersReacted = new HashMap<>();
+
+	private void sendEndMatchButtons(List<User> usersReacted, Long matchId) {
+		matchIdToUsersReacted.put(matchId, usersReacted);
+
+		for (User user : usersReacted) {
+			user.openPrivateChannel().flatMap(
+					privateChannel -> privateChannel.sendMessage("Please choose the winning team and the score:"))
+					.flatMap(message -> message.editMessageComponents(
+							ActionRow.of(Button.primary("winning_team_1_" + matchId, "Team 1"),
+									Button.primary("winning_team_2_" + matchId, "Team 2")),
+							ActionRow.of(Button.secondary("winning_score_2_0_" + matchId, "2-0"),
+									Button.secondary("winning_score_2_1_" + matchId, "2-1"))))
+					.queue();
+		}
+	}
+
 	private void waitForApproval(MessageReactionAddEvent event, String approvalMessageId, List<String> reactions,
 			List<UserDTO> usersReacted) {
 
@@ -279,13 +307,14 @@ public class MessageReactionListener extends ListenerAdapter {
 					MatchDTO match = matchService.createMatch(new MatchDTO());
 					Long matchId = match.getId();
 
-					MessageEmbed embed = teamBalancerService.balanceTeams(reactions, usersReacted, matchId);
-					event.getChannel().sendMessage(embed).queue();
+					// Add ButtonClickListener to the JDA
+					event.getJDA().addEventListener(new ButtonClickListener(matchService, matchResultService));
 
-					// Create poll after a match has been created
-					createPoll(event, usersReacted, match, matchResult -> {
-						waitForPollResults(event, matchId, usersReacted);
-					});
+					MessageEmbed embed = teamBalancerService.balanceTeams(reactions, usersReacted, matchId);
+					ActionRow actionRow = ActionRow.of(Button.primary("end_match_" + matchId, "End Match: " + matchId));
+					System.out.println("ActionRow: " + actionRow.toString());
+
+					event.getChannel().sendMessageEmbeds(embed).setActionRows(actionRow).queue();
 				} else if (approvalEvent.getReactionEmote().getEmoji().equals("❌")) {
 					event.getChannel().sendMessage("Match creation request rejected.").queue();
 				}
@@ -293,6 +322,6 @@ public class MessageReactionListener extends ListenerAdapter {
 				event.getJDA().removeEventListener(this);
 			}
 		});
-	}
 
+	}
 }

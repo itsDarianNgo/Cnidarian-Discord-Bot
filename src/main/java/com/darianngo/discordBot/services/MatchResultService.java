@@ -1,7 +1,10 @@
 package com.darianngo.discordBot.services;
 
 import com.darianngo.discordBot.dtos.MatchResultDTO;
+import com.darianngo.discordBot.entities.UserEntity;
 
 public interface MatchResultService {
-	MatchResultDTO saveMatchResult(MatchResultDTO matchResultDTO);
+
+	void saveVote(MatchResultDTO matchResultDTO, UserEntity userId);
+
 }

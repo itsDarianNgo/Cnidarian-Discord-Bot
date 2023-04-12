@@ -9,8 +9,10 @@ import com.darianngo.discordBot.entities.TeamEntity;
 @Mapper(componentModel = "spring")
 public interface TeamMapper {
 	@Mapping(source = "match.id", target = "matchId")
+    @Mapping(source = "userTeams", target = "members")
 	TeamDTO toDto(TeamEntity teamEntity);
 
 	@Mapping(target = "match.id", source = "matchId")
+    @Mapping(source = "members", target = "userTeams")
 	TeamEntity toEntity(TeamDTO teamDTO);
 }

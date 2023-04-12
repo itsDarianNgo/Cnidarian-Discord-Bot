@@ -10,8 +10,10 @@ import org.springframework.context.annotation.PropertySource;
 import com.darianngo.discordBot.commands.CreateCustomGameCommand;
 import com.darianngo.discordBot.commands.SetupLoLProfileCommand;
 import com.darianngo.discordBot.commands.ShowLoLProfileCommand;
+import com.darianngo.discordBot.listeners.ButtonClickListener;
 import com.darianngo.discordBot.listeners.MessageReactionListener;
 import com.darianngo.discordBot.listeners.SlashCommandListener;
+import com.darianngo.discordBot.services.impl.DirectMessageServiceImpl;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -23,10 +25,11 @@ public class JdaConfig {
 	private String token;
 
 	@Bean
-	public JDA jda(MessageReactionListener messageReactionListener, SlashCommandListener slashCommandListener)
-			throws LoginException, InterruptedException {
-		JDA jda = JDABuilder.createDefault(token).addEventListeners(messageReactionListener, slashCommandListener)
-				.build().awaitReady();
+	public JDA jda(MessageReactionListener messageReactionListener, SlashCommandListener slashCommandListener,
+			DirectMessageServiceImpl directMessageService, ButtonClickListener buttonClickListener) throws LoginException, InterruptedException {
+		JDA jda = JDABuilder.createDefault(token)
+				.addEventListeners(messageReactionListener, slashCommandListener, directMessageService, buttonClickListener).build()
+				.awaitReady();
 
 		registerSlashCommands(jda);
 
@@ -37,6 +40,5 @@ public class JdaConfig {
 		jda.upsertCommand(SetupLoLProfileCommand.COMMAND_DATA).queue();
 		jda.upsertCommand(ShowLoLProfileCommand.COMMAND_DATA).queue();
 		jda.upsertCommand(CreateCustomGameCommand.COMMAND_DATA).queue();
-
 	}
 }
