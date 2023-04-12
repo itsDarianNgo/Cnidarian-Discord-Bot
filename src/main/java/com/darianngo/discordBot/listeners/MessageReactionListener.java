@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -163,17 +164,9 @@ public class MessageReactionListener extends ListenerAdapter {
 		AtomicInteger team2Votes = new AtomicInteger();
 		AtomicReference<String> finalScore = new AtomicReference<>("");
 
-		reactions.forEach(reaction -> {
-			if (reaction.getReactionEmote().getEmoji().equals("1️⃣")) {
-				team1Votes.set(reaction.getCount() - 1);
-			} else if (reaction.getReactionEmote().getEmoji().equals("2️⃣")) {
-				team2Votes.set(reaction.getCount() - 1);
-			} else if (reaction.getReactionEmote().getEmoji().equals("🔥")) {
-				finalScore.set("2-0");
-			} else if (reaction.getReactionEmote().getEmoji().equals("🌊")) {
-				finalScore.set("2-1");
-			}
-		});
+		AtomicBoolean team1Reacted = new AtomicBoolean(false);
+		AtomicBoolean team2Reacted = new AtomicBoolean(false);
+		AtomicBoolean scoreReacted = new AtomicBoolean(false);
 
 		event.getJDA().addEventListener(new ListenerAdapter() {
 			@Override
@@ -182,15 +175,29 @@ public class MessageReactionListener extends ListenerAdapter {
 					return;
 				}
 
-				Optional<String> winningTeam = Optional.empty();
+				String emoji = event.getReactionEmote().getEmoji();
+				if (emoji.equals("1️⃣")) {
+					team1Votes.incrementAndGet();
+					team1Reacted.set(true);
+				} else if (emoji.equals("2️⃣")) {
+					team2Votes.incrementAndGet();
+					team2Reacted.set(true);
+				} else if (emoji.equals("🔥")) {
+					finalScore.set("2-0");
+					scoreReacted.set(true);
+				} else if (emoji.equals("🌊")) {
+					finalScore.set("2-1");
+					scoreReacted.set(true);
+				}
 
-				if (team1Votes.get() >= 1) {
+				Optional<String> winningTeam = Optional.empty();
+				if (team1Votes.get() >= 1 && team1Reacted.get()) {
 					winningTeam = Optional.of("Team 1");
-				} else if (team2Votes.get() >= 1) {
+				} else if (team2Votes.get() >= 1 && team2Reacted.get()) {
 					winningTeam = Optional.of("Team 2");
 				}
 
-				if (winningTeam.isPresent()) {
+				if (winningTeam.isPresent() && scoreReacted.get() && !finalScore.get().isEmpty()) {
 					try {
 						updateMatchResults(matchId, winningTeam.get(), finalScore.get());
 					} catch (NotFoundException e) {
@@ -199,6 +206,13 @@ public class MessageReactionListener extends ListenerAdapter {
 					}
 					event.getChannel().sendMessage("Poll has ended. " + winningTeam.get()
 							+ " won the match with a score of " + finalScore.get()).queue();
+
+					Message message = event.getTextChannel().retrieveMessageById(event.getMessageId()).complete();
+					for (MessageReaction reaction : message.getReactions()) {
+						reaction.removeReaction().queue();
+					}
+					message.clearReactions().queue();
+
 					event.getJDA().removeEventListener(this); // Remove the listener after processing the poll
 				}
 			}
@@ -206,14 +220,14 @@ public class MessageReactionListener extends ListenerAdapter {
 	}
 
 	private void updateMatchResults(Long matchId, String winningTeam, String finalScore) throws NotFoundException {
-	    System.out.println("Updating match results for matchId: " + matchId);
-	    MatchDTO match = matchService.getMatchById(matchId);
-	    match.setWinningTeam(winningTeam);
-	    match.setFinalScore(finalScore);
-	    matchService.updateMatch(match);
-	    System.out.println("Updated match results for matchId: " + matchId + ", winningTeam: " + winningTeam + ", finalScore: " + finalScore);
+		System.out.println("Updating match results for matchId: " + matchId);
+		MatchDTO match = matchService.getMatchById(matchId);
+		match.setWinningTeam(winningTeam);
+		match.setFinalScore(finalScore);
+		matchService.updateMatch(match);
+		System.out.println("Updated match results for matchId: " + matchId + ", winningTeam: " + winningTeam
+				+ ", finalScore: " + finalScore);
 	}
-
 
 	private boolean isUserInMatch(List<UserDTO> usersReacted, String userId) {
 		return usersReacted.stream().anyMatch(user -> user.getDiscordId().equals(userId));
