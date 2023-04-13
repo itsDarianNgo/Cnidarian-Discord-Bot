@@ -35,4 +35,11 @@ public class MatchResultServiceImpl implements MatchResultService {
 
 		matchResultRepository.save(matchResultEntity);
 	}
+
+	@Override
+	public MatchResultDTO saveMatchResult(MatchResultDTO matchResult) {
+		MatchResultEntity matchResultEntity = matchResultMapper.toEntity(matchResult);
+		matchResultEntity = matchResultRepository.save(matchResultEntity);
+		return matchResultMapper.toDTO(matchResultEntity);
+	}
 }

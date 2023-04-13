@@ -17,8 +17,10 @@ public interface MatchService {
 
 	MatchDTO getMatchById(Long matchId) throws NotFoundException;
 
-	MatchResultDTO saveMatchResult(MatchResultDTO matchResult);
-	
 	List<UserDTO> getUsersInMatch(Long matchId);
+
+	List<UserDTO> getUsersReactedForMatch(Long matchId);
+
+	void saveMatchResult(MatchResultDTO matchResultDTO);
 
 }

@@ -1,6 +1,9 @@
 package com.darianngo.discordBot.services.impl;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +17,7 @@ import com.darianngo.discordBot.entities.MatchResultEntity;
 import com.darianngo.discordBot.entities.TeamEntity;
 import com.darianngo.discordBot.entities.UserEntity;
 import com.darianngo.discordBot.entities.UserTeamEntity;
+import com.darianngo.discordBot.exceptions.MatchNotFoundException;
 import com.darianngo.discordBot.mappers.MatchMapper;
 import com.darianngo.discordBot.mappers.MatchResultMapper;
 import com.darianngo.discordBot.mappers.TeamMapper;
@@ -25,6 +29,8 @@ import com.darianngo.discordBot.repositories.UserRepository;
 import com.darianngo.discordBot.repositories.UserTeamRepository;
 import com.darianngo.discordBot.services.MatchService;
 
+import jakarta.persistence.EntityGraph;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 
@@ -44,6 +50,8 @@ public class MatchServiceImpl implements MatchService {
 	private TeamRepository teamRepository;
 	@Autowired
 	private TeamMapper teamMapper;
+	@Autowired
+	private EntityManager entityManager;
 
 	public MatchServiceImpl(MatchRepository matchRepository, MatchMapper matchMapper, UserRepository userRepository,
 			MatchResultRepository matchResultRepository, MatchResultMapper matchResultMapper, UserMapper userMapper) {
@@ -110,17 +118,40 @@ public class MatchServiceImpl implements MatchService {
 		return matchMapper.toDto(matchEntity);
 	}
 
-	@Override
-	public MatchResultDTO saveMatchResult(MatchResultDTO matchResult) {
-		MatchResultEntity matchResultEntity = matchResultMapper.toEntity(matchResult);
-		matchResultEntity = matchResultRepository.save(matchResultEntity);
-		return matchResultMapper.toDTO(matchResultEntity);
-	}
-
 	public List<UserDTO> getUsersInMatch(Long matchId) {
 		List<UserTeamEntity> userTeamEntities = userTeamRepository.findByTeamMatchId(matchId);
 		List<UserDTO> users = userTeamEntities.stream().map(UserTeamEntity::getUser).map(userMapper::toDto)
 				.collect(Collectors.toList());
 		return users;
+	}
+
+	@Override
+	public List<UserDTO> getUsersReactedForMatch(Long matchId) {
+		EntityGraph<?> entityGraph = entityManager.createEntityGraph("MatchEntity.teamsAndUsers");
+		Map<String, Object> properties = new HashMap<>();
+		properties.put("javax.persistence.fetchgraph", entityGraph);
+		MatchEntity matchEntity = entityManager.find(MatchEntity.class, matchId, properties);
+
+		if (matchEntity == null) {
+			throw new MatchNotFoundException("Match not found with id: " + matchId);
+		}
+
+		List<TeamEntity> teams = matchEntity.getTeams();
+		List<UserDTO> usersReacted = new ArrayList<>();
+
+		for (TeamEntity team : teams) {
+			for (UserTeamEntity userTeamEntity : team.getUserTeams()) {
+				UserEntity userEntity = userTeamEntity.getUser();
+				usersReacted.add(userMapper.toDto(userEntity));
+			}
+		}
+
+		return usersReacted;
+	}
+
+	@Override
+	public void saveMatchResult(MatchResultDTO matchResultDTO) {
+		MatchResultEntity matchResultEntity = matchResultMapper.toEntity(matchResultDTO);
+		matchResultRepository.save(matchResultEntity);
 	}
 }

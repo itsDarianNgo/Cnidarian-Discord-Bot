@@ -2,6 +2,7 @@ package com.darianngo.discordBot.config;
 
 import javax.security.auth.login.LoginException;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,7 +14,6 @@ import com.darianngo.discordBot.commands.ShowLoLProfileCommand;
 import com.darianngo.discordBot.listeners.ButtonClickListener;
 import com.darianngo.discordBot.listeners.MessageReactionListener;
 import com.darianngo.discordBot.listeners.SlashCommandListener;
-import com.darianngo.discordBot.services.impl.DirectMessageServiceImpl;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -25,10 +25,11 @@ public class JdaConfig {
 	private String token;
 
 	@Bean
-	public JDA jda(MessageReactionListener messageReactionListener, SlashCommandListener slashCommandListener,
-			DirectMessageServiceImpl directMessageService, ButtonClickListener buttonClickListener) throws LoginException, InterruptedException {
+	public JDA jda(@Autowired MessageReactionListener messageReactionListener,
+			@Autowired SlashCommandListener slashCommandListener, @Autowired ButtonClickListener buttonClickListener)
+			throws LoginException, InterruptedException {
 		JDA jda = JDABuilder.createDefault(token)
-				.addEventListeners(messageReactionListener, slashCommandListener, directMessageService, buttonClickListener).build()
+				.addEventListeners(messageReactionListener, slashCommandListener, buttonClickListener).build()
 				.awaitReady();
 
 		registerSlashCommands(jda);

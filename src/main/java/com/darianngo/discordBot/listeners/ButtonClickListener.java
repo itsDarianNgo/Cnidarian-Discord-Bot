@@ -1,96 +1,153 @@
 package com.darianngo.discordBot.listeners;
 
 import java.awt.Color;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import org.springframework.stereotype.Component;
 
 import com.darianngo.discordBot.dtos.MatchResultDTO;
 import com.darianngo.discordBot.dtos.UserDTO;
-import com.darianngo.discordBot.services.MatchResultService;
 import com.darianngo.discordBot.services.MatchService;
 
-import jakarta.annotation.Nonnull;
 import net.dv8tion.jda.api.EmbedBuilder;
-import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.MessageChannel;
+import net.dv8tion.jda.api.entities.MessageEmbed;
+import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.ButtonClickEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.components.ActionRow;
 import net.dv8tion.jda.api.interactions.components.Button;
-import net.dv8tion.jda.api.requests.restaction.MessageAction;
+import net.dv8tion.jda.api.interactions.components.Component;
 
-@Component
+@org.springframework.stereotype.Component
 public class ButtonClickListener extends ListenerAdapter {
-	private MatchService matchService;
-	private MatchResultService matchResultService;
+	private final MatchService matchService;
+	private final Map<String, AtomicInteger> matchVoteCounter = new HashMap<>();
+	private final Map<String, MatchResultDTO> matchResults = new HashMap<>();
 
-	// Store the votes for each match
-	private Map<Long, Map<Long, AtomicInteger>> teamVotes = new HashMap<>();
-	private Map<Long, Map<String, AtomicInteger>> scoreVotes = new HashMap<>();
-
-	public ButtonClickListener(MatchService matchService, MatchResultService matchResultService) {
+	public ButtonClickListener(MatchService matchService) {
 		this.matchService = matchService;
-		this.matchResultService = matchResultService;
 	}
 
 	@Override
-//	CODE WORKS BUT SPAMS messages twice then voting doesnt work atm.
-	public void onButtonClick(@Nonnull ButtonClickEvent event) {
-	    System.out.println("Button clicked: " + event.getButton().getId());
+	public void onButtonClick(ButtonClickEvent event) {
+		String[] buttonIdParts = event.getComponentId().split("_");
+		String action = buttonIdParts[0];
 
-	    if (event.getButton().getId().startsWith("end_match_")) {
-	        // Acknowledge the interaction
-	        event.deferReply().setEphemeral(true).queue();
-
-	        Long matchId = Long.parseLong(event.getButton().getId().split("_")[2]);
-
-	        // Retrieve the users involved in the match, and populate the usersInMatch list
-	        List<UserDTO> usersInMatch = matchService.getUsersInMatch(matchId);
-
-	        sendDmToUsers(usersInMatch, matchId, event.getJDA());
-	        System.out.println("DM sent to users for match " + matchId);
-	    } else if (event.getButton().getId().startsWith("vote_")) {
-	        // Disable the clicked button
-	        Button clickedButton = event.getButton();
-	        Button disabledButton = clickedButton.asDisabled();
-	        event.getHook().editOriginalComponents(ActionRow.of(disabledButton)).queue();
-
-	        // Process the vote
-	        if (event.getButton().getId().endsWith("_team_1") || event.getButton().getId().endsWith("_team_2")) {
-	        }
-	    }
+		if ("end".equals(action)) {
+			handleEndButtonClick(event);
+		} else if ("vote".equals(action)) {
+			handleVoteButtonClick(event, buttonIdParts);
+		}
 	}
 
+	private void handleEndButtonClick(ButtonClickEvent event) {
+		String componentId = event.getComponentId();
+		if (!componentId.startsWith("end_match_")) {
+			return; // Ignore the button click if the component ID does not start with "end_match_".
+		}
 
-	// Send DM to users with buttons for voting
-	private void sendDmToUsers(List<UserDTO> users, Long matchId, JDA jda) {
-		EmbedBuilder embed = new EmbedBuilder().setTitle("Vote for the winning team and score")
-				.setDescription("Please select the winning team and the final score").setColor(Color.CYAN);
+		String matchId = componentId.substring("end_match_".length());
+		List<UserDTO> usersReacted = matchService.getUsersReactedForMatch(Long.parseLong(matchId));
 
-		ActionRow teamRow = ActionRow.of(Button.primary("vote_" + matchId + "_team_1", "Team 1"),
-				Button.primary("vote_" + matchId + "_team_2", "Team 2"));
+		for (UserDTO userDTO : usersReacted) {
+			User user = event.getJDA().retrieveUserById(userDTO.getDiscordId()).complete();
+			sendVotingDM(user, matchId);
+		}
+	}
 
-		ActionRow scoreRow = ActionRow.of(Button.primary("vote_" + matchId + "_score_2-0", "2-0"),
-				Button.primary("vote_" + matchId + "_score_2-1", "2-1"));
+	private void sendVotingDM(User user, String matchId) {
+		EmbedBuilder embedBuilder = new EmbedBuilder();
+		embedBuilder.setTitle("Vote for the winning team and score");
+		embedBuilder.setDescription("Please select the winning team and score for match " + matchId + ".");
+		embedBuilder.setColor(Color.CYAN);
 
-		users.stream().filter(Objects::nonNull)
-				.filter(user -> user.getDiscordId() != null && !user.getDiscordId().isEmpty()).forEach(user -> {
-					jda.openPrivateChannelById(user.getDiscordId()).queue(privateChannel -> {
-						System.out.println("Sending DMs to " + users.size() + " users for match " + matchId);
+		MessageEmbed embed = embedBuilder.build();
 
-						System.out.println("Opening private channel with user " + user.getDiscordId());
-						privateChannel.sendMessageEmbeds(embed.build()).setActionRows(teamRow, scoreRow)
-								.queue(message -> {
-									System.out.println(
-											"Sent DM to user " + user.getDiscordId() + " for match " + matchId);
-								});
+		List<Component> components = new ArrayList<>();
+		components.add(Button.primary("vote_team1_" + matchId, "Team 1"));
+		components.add(Button.primary("vote_team2_" + matchId, "Team 2"));
+		components.add(Button.primary("vote_score20_" + matchId, "2-0"));
+		components.add(Button.primary("vote_score21_" + matchId, "2-1"));
 
-					});
-				});
+		user.openPrivateChannel().queue(privateChannel -> {
+			privateChannel.sendMessageEmbeds(embed).setActionRow(components).queue();
+		});
+	}
+
+	private void handleVoteButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
+		String voteType = buttonIdParts[1];
+		String matchId = buttonIdParts[2];
+		String userVoteKey = event.getUser().getId() + "_" + matchId;
+
+		if (matchVoteCounter.containsKey(userVoteKey)) {
+
+			AtomicInteger voteCount = matchVoteCounter.get(userVoteKey);
+			if (voteCount.get() >= 5) {
+				event.reply("You cannot vote anymore. The maximum number of votes has been reached.").setEphemeral(true)
+						.queue();
+				return;
+			}
+		} else {
+			matchVoteCounter.put(userVoteKey, new AtomicInteger(0));
+		}
+
+		MatchResultDTO matchResult = matchResults.getOrDefault(matchId, new MatchResultDTO());
+		matchResults.put(matchId, matchResult);
+		matchResult.setMatchId(Long.parseLong(matchId));
+
+		if ("team1".equals(voteType)) {
+			matchResult.setWinningTeamId(1L);
+			disableButton(event.getMessage(), "vote_team2_" + matchId);
+		} else if ("team2".equals(voteType)) {
+			matchResult.setWinningTeamId(2L);
+			disableButton(event.getMessage(), "vote_team1_" + matchId);
+		} else if ("score20".equals(voteType)) {
+			matchResult.setWinningScore(2);
+			matchResult.setLosingScore(0);
+			disableButton(event.getMessage(), "vote_score21_" + matchId);
+		} else if ("score21".equals(voteType)) {
+			matchResult.setWinningScore(2);
+			matchResult.setLosingScore(1);
+			disableButton(event.getMessage(), "vote_score20_" + matchId);
+		}
+
+		matchVoteCounter.get(userVoteKey).incrementAndGet();
+
+		if (matchResult.getWinningTeamId() != null && matchResult.getWinningScore() != null) {
+			matchService.saveMatchResult(matchResult);
+			displayFinalResult(event.getChannel(), matchResult);
+		}
+	}
+
+	private void disableButton(Message message, String buttonIdToDisable) {
+		List<Component> updatedComponents = new ArrayList<>();
+
+		for (Component component : message.getActionRows().get(0).getComponents()) {
+			if (component.getId().equals(buttonIdToDisable)) {
+				Button button = (Button) component;
+				updatedComponents
+						.add(Button.of(button.getStyle(), button.getId(), button.getLabel()).withDisabled(true));
+			} else {
+				updatedComponents.add(component);
+			}
+		}
+
+		message.editMessageComponents(ActionRow.of(updatedComponents)).queue();
+	}
+
+	private void displayFinalResult(MessageChannel channel, MatchResultDTO matchResult) {
+		EmbedBuilder embedBuilder = new EmbedBuilder();
+		embedBuilder.setTitle("Final Match Result");
+		embedBuilder.setDescription("The final result for match " + matchResult.getMatchId() + " is:");
+		embedBuilder.addField("Winning Team", "Team " + matchResult.getWinningTeamId(), false);
+		embedBuilder.addField("Score", matchResult.getWinningScore() + "-" + matchResult.getLosingScore(), false);
+		embedBuilder.setColor(Color.GREEN);
+
+		MessageEmbed embed = embedBuilder.build();
+		channel.sendMessageEmbeds(embed).queue();
 	}
 }

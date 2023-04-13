@@ -7,4 +7,6 @@ public interface MatchResultService {
 
 	void saveVote(MatchResultDTO matchResultDTO, UserEntity userId);
 
+	MatchResultDTO saveMatchResult(MatchResultDTO matchResult);
+
 }
