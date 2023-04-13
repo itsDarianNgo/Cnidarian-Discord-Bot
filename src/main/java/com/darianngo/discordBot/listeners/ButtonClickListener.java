@@ -42,6 +42,7 @@ public class ButtonClickListener extends ListenerAdapter {
 		} else if ("vote".equals(action)) {
 			handleVoteButtonClick(event, buttonIdParts);
 		}
+		event.deferEdit().queue();// Acknowledge the event
 	}
 
 	private void handleEndButtonClick(ButtonClickEvent event) {
