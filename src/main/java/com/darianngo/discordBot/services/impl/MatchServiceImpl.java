@@ -118,6 +118,13 @@ public class MatchServiceImpl implements MatchService {
 		return matchMapper.toDto(matchEntity);
 	}
 
+	@Transactional
+	@Override
+	public MatchEntity getMatchEntityById(Long matchId) {
+		return matchRepository.findById(matchId)
+				.orElseThrow(() -> new EntityNotFoundException("Match not found with ID: " + matchId));
+	}
+	@Override
 	public List<UserDTO> getUsersInMatch(Long matchId) {
 		List<UserTeamEntity> userTeamEntities = userTeamRepository.findByTeamMatchId(matchId);
 		List<UserDTO> users = userTeamEntities.stream().map(UserTeamEntity::getUser).map(userMapper::toDto)
@@ -154,4 +161,27 @@ public class MatchServiceImpl implements MatchService {
 		MatchResultEntity matchResultEntity = matchResultMapper.toEntity(matchResultDTO);
 		matchResultRepository.save(matchResultEntity);
 	}
+
+	@Override
+	public Map<Long, List<UserDTO>> getTeamMembers(List<TeamEntity> teams) {
+		Map<Long, List<UserDTO>> teamMembers = new HashMap<>();
+
+		for (TeamEntity team : teams) {
+			Long teamId = team.getId();
+			List<UserEntity> userEntities = team.getUserTeams().stream().map(UserTeamEntity::getUser)
+					.collect(Collectors.toList());
+
+			List<UserDTO> userDTOs = userEntities.stream().map(userEntity -> {
+				UserDTO userDTO = new UserDTO();
+				userDTO.setDiscordId(userEntity.getDiscordId());
+				userDTO.setDiscordName(userEntity.getDiscordName());
+				return userDTO;
+			}).collect(Collectors.toList());
+
+			teamMembers.put(teamId, userDTOs);
+		}
+
+		return teamMembers;
+	}
+
 }

@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.darianngo.discordBot.dtos.MatchResultDTO;
 import com.darianngo.discordBot.dtos.UserDTO;
+import com.darianngo.discordBot.entities.MatchEntity;
 import com.darianngo.discordBot.services.MatchService;
 
 import net.dv8tion.jda.api.EmbedBuilder;
@@ -61,12 +62,11 @@ public class ButtonClickListener extends ListenerAdapter {
 	}
 
 	private void sendVotingDM(User user, String matchId) {
-		EmbedBuilder embedBuilder = new EmbedBuilder();
-		embedBuilder.setTitle("Vote for the winning team and score");
-		embedBuilder.setDescription("Please select the winning team and score for match " + matchId + ".");
-		embedBuilder.setColor(Color.CYAN);
+		Long matchIdLong = Long.parseLong(matchId);
+		MatchEntity matchEntity = matchService.getMatchEntityById(matchIdLong);
+		Map<Long, List<UserDTO>> teamMembers = matchService.getTeamMembers(matchEntity.getTeams());
 
-		MessageEmbed embed = embedBuilder.build();
+		MessageEmbed embed = buildEmbed(matchId, teamMembers);
 
 		List<Component> components = new ArrayList<>();
 		components.add(Button.primary("vote_team1_" + matchId, "Team 1"));
@@ -77,6 +77,28 @@ public class ButtonClickListener extends ListenerAdapter {
 		user.openPrivateChannel().queue(privateChannel -> {
 			privateChannel.sendMessageEmbeds(embed).setActionRow(components).queue();
 		});
+	}
+
+	private MessageEmbed buildEmbed(String matchId, Map<Long, List<UserDTO>> teamMembers) {
+		EmbedBuilder embedBuilder = new EmbedBuilder();
+		embedBuilder.setTitle("Vote for the winning team and score");
+		embedBuilder.setDescription("Please select the winning team and score for match: " + matchId + "\n\n");
+		embedBuilder.setColor(Color.CYAN);
+
+		int teamNumber = 1;
+		for (Map.Entry<Long, List<UserDTO>> entry : teamMembers.entrySet()) {
+			StringBuilder teamDescription = new StringBuilder();
+			List<String> memberNames = new ArrayList<>();
+			for (UserDTO userDTO : entry.getValue()) {
+				memberNames.add("@" + userDTO.getDiscordName());
+			}
+			teamDescription.append(String.join(", ", memberNames));
+
+			embedBuilder.addField("Team " + teamNumber, teamDescription.toString(), true);
+			teamNumber++;
+		}
+
+		return embedBuilder.build();
 	}
 
 	private void handleVoteButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
