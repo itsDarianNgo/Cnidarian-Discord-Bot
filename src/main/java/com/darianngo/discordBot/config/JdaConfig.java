@@ -26,8 +26,8 @@ public class JdaConfig {
 
 	@Bean
 	public JDA jda(@Autowired MessageReactionListener messageReactionListener,
-			@Autowired SlashCommandListener slashCommandListener, @Autowired ButtonClickListener buttonClickListener)
-			throws LoginException, InterruptedException {
+	               @Autowired SlashCommandListener slashCommandListener,
+	               @Autowired ButtonClickListener buttonClickListener) throws LoginException, InterruptedException {
 		JDA jda = JDABuilder.createDefault(token)
 				.addEventListeners(messageReactionListener, slashCommandListener, buttonClickListener).build()
 				.awaitReady();

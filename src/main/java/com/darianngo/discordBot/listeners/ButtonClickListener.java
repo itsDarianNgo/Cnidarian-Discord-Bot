@@ -2,11 +2,16 @@ package com.darianngo.discordBot.listeners;
 
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.darianngo.discordBot.config.DiscordChannelConfig;
 import com.darianngo.discordBot.dtos.MatchResultDTO;
 import com.darianngo.discordBot.dtos.UserDTO;
 import com.darianngo.discordBot.entities.MatchEntity;
@@ -16,6 +21,7 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageChannel;
 import net.dv8tion.jda.api.entities.MessageEmbed;
+import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.ButtonClickEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -28,10 +34,15 @@ public class ButtonClickListener extends ListenerAdapter {
 	private final MatchService matchService;
 	private final Map<String, AtomicInteger> matchVoteCounter = new HashMap<>();
 	private final Map<String, MatchResultDTO> matchResults = new HashMap<>();
+	private final Map<String, AtomicInteger> adminMatchVoteCounter = new ConcurrentHashMap<>();
+	private final Map<String, MatchResultDTO> adminMatchResults = new HashMap<>();
 
 	public ButtonClickListener(MatchService matchService) {
 		this.matchService = matchService;
 	}
+
+	@Autowired
+	private DiscordChannelConfig discordChannelConfig;
 
 	@Override
 	public void onButtonClick(ButtonClickEvent event) {
@@ -42,8 +53,47 @@ public class ButtonClickListener extends ListenerAdapter {
 			handleEndButtonClick(event);
 		} else if ("vote".equals(action)) {
 			handleVoteButtonClick(event, buttonIdParts);
+		} else if ("approve".equals(action)) {
+			handleApproveButtonClick(event, buttonIdParts);
+		} else if ("reject".equals(action)) {
+			handleRejectButtonClick(event, buttonIdParts);
+		} else if ("admin_vote".equals(action)) {
+			handleAdminVoteButtonClick(event, buttonIdParts);
 		}
 		event.deferEdit().queue();// Acknowledge the event
+	}
+
+	private void handleAdminVoteButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
+		String voteType = buttonIdParts[1];
+		String matchId = buttonIdParts[2];
+		String userVoteKey = event.getUser().getId() + "_" + matchId;
+		if (!adminMatchVoteCounter.containsKey(userVoteKey)) {
+			adminMatchVoteCounter.put(userVoteKey, new AtomicInteger(0));
+		}
+
+		AtomicInteger voteCount = adminMatchVoteCounter.get(userVoteKey);
+		voteCount.incrementAndGet();
+
+		MatchResultDTO matchResult = matchResults.get(matchId);
+
+		if ("team1".equals(voteType)) {
+			matchResult.setWinningTeamId(1L);
+		} else if ("team2".equals(voteType)) {
+			matchResult.setWinningTeamId(2L);
+		} else if ("score20".equals(voteType)) {
+			matchResult.setWinningScore(2);
+			matchResult.setLosingScore(0);
+		} else if ("score21".equals(voteType)) {
+			matchResult.setWinningScore(2);
+			matchResult.setLosingScore(1);
+		}
+
+		if (matchResult.getWinningTeamId() != null && matchResult.getWinningScore() != null) {
+			if (voteCount.get() >= 2) {
+				event.getMessage().delete().queue();
+				sendApprovalRequest(event, matchResult);
+			}
+		}
 	}
 
 	private void handleEndButtonClick(ButtonClickEvent event) {
@@ -59,6 +109,22 @@ public class ButtonClickListener extends ListenerAdapter {
 			User user = event.getJDA().retrieveUserById(userDTO.getDiscordId()).complete();
 			sendVotingDM(user, matchId);
 		}
+	}
+
+	private void handleApproveButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
+		String matchId = buttonIdParts[1];
+		MatchResultDTO matchResult = matchResults.get(matchId);
+		matchService.saveMatchResult(matchResult);
+		event.getMessage().delete().queue();
+	}
+
+	private void handleRejectButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
+		String matchId = buttonIdParts[1];
+		MatchResultDTO matchResult = matchResults.get(matchId);
+		event.getMessage().delete().queue();
+
+		User user = event.getUser();
+		sendAdminVotingDM(user, matchId, matchResult);
 	}
 
 	private void sendVotingDM(User user, String matchId) {
@@ -77,6 +143,28 @@ public class ButtonClickListener extends ListenerAdapter {
 		user.openPrivateChannel().queue(privateChannel -> {
 			privateChannel.sendMessageEmbeds(embed).setActionRow(components).queue();
 		});
+	}
+
+	private void sendAdminVotingDM(User admin, String matchId, MatchResultDTO matchResult) {
+		Map<Long, List<UserDTO>> teamMembers = matchService
+				.getTeamMembers(matchService.getMatchEntityById(Long.parseLong(matchId)).getTeams());
+
+		MessageEmbed embed = buildEmbed(matchId, teamMembers);
+
+		List<Component> components = new ArrayList<>();
+		components.add(Button.primary("admin_vote_team1_" + matchId, "Team 1"));
+		components.add(Button.primary("admin_vote_team2_" + matchId, "Team 2"));
+		components.add(Button.primary("admin_vote_score20_" + matchId, "2-0"));
+		components.add(Button.primary("admin_vote_score21_" + matchId, "2-1"));
+
+		String approvalChannelId = discordChannelConfig.getApprovalChannelId();
+		TextChannel approvalChannel = admin.getJDA().getTextChannelById(approvalChannelId);
+
+		if (approvalChannel != null) {
+			approvalChannel.sendMessageEmbeds(embed).setActionRow(components).queue();
+		} else {
+			System.out.println("Error: Approval channel not found.");
+		}
 	}
 
 	private MessageEmbed buildEmbed(String matchId, Map<Long, List<UserDTO>> teamMembers) {
@@ -109,7 +197,7 @@ public class ButtonClickListener extends ListenerAdapter {
 		if (matchVoteCounter.containsKey(userVoteKey)) {
 
 			AtomicInteger voteCount = matchVoteCounter.get(userVoteKey);
-			if (voteCount.get() >= 5) {
+			if (voteCount.get() >= 2) {
 				event.reply("You cannot vote anymore. The maximum number of votes has been reached.").setEphemeral(true)
 						.queue();
 				return;
@@ -144,6 +232,31 @@ public class ButtonClickListener extends ListenerAdapter {
 			matchService.saveMatchResult(matchResult);
 			displayFinalResult(event.getChannel(), matchResult);
 		}
+		if (matchResult.getWinningTeamId() != null && matchResult.getWinningScore() != null) {
+			AtomicInteger voteCount = matchVoteCounter.get(userVoteKey);
+			if (voteCount.get() >= 2) {
+				sendApprovalRequest(event, matchResult);
+			}
+		}
+	}
+
+	private void sendApprovalRequest(ButtonClickEvent event, MatchResultDTO matchResult) {
+		MessageChannel approvalChannel = event.getJDA().getTextChannelById(discordChannelConfig.getApprovalChannelId());
+
+		EmbedBuilder embedBuilder = new EmbedBuilder();
+		embedBuilder.setTitle("Match Result Approval");
+		embedBuilder.setDescription("Please approve or reject the match result");
+		embedBuilder.setColor(Color.YELLOW);
+		embedBuilder.addField("Winning Team", "Team " + matchResult.getWinningTeamId(), true);
+		embedBuilder.addField("Score", matchResult.getWinningScore() + "-" + matchResult.getLosingScore(), true);
+
+		MessageEmbed embed = embedBuilder.build();
+
+		ActionRow actionRow = ActionRow.of(Button.success("approve_" + matchResult.getMatchId(), "✅"),
+				Button.danger("reject_" + matchResult.getMatchId(), "❌"));
+
+		approvalChannel.sendMessageEmbeds(embed).setActionRows(Collections.singletonList(actionRow)).queue();
+
 	}
 
 	private void disableButton(Message message, String buttonIdToDisable) {
@@ -173,4 +286,5 @@ public class ButtonClickListener extends ListenerAdapter {
 		MessageEmbed embed = embedBuilder.build();
 		channel.sendMessageEmbeds(embed).queue();
 	}
+
 }

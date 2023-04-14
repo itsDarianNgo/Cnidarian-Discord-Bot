@@ -52,7 +52,8 @@ public class UserServiceImpl implements UserService {
 		UserEntity userEntity = userRepository.findById(discordId).orElse(null);
 
 		if (userEntity == null) {
-			UserDTO newUserDTO = new UserDTO(discordId, discordName, mainRole, null, secondaryRole, null, null, null, null, null);
+			UserDTO newUserDTO = new UserDTO(discordId, discordName, mainRole, null, secondaryRole, null, null, null,
+					null, null);
 			UserEntity newUser = userRepository.save(userMapper.toEntity(newUserDTO));
 			return userMapper.toDto(newUser);
 		} else {
