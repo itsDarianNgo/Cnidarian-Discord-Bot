@@ -35,8 +35,8 @@ import net.dv8tion.jda.api.interactions.components.Component;
 public class ButtonClickListener extends ListenerAdapter {
 	private final MatchService matchService;
 	private Map<String, UserVoteDTO> userVotes = new ConcurrentHashMap<>();
-	private final Map<String, AtomicInteger> adminMatchVoteCounter = new ConcurrentHashMap<>();
 	private final Map<String, MatchResultDTO> matchResults = new HashMap<>();
+	private final Map<String, AtomicInteger> usersFullyVoted = new ConcurrentHashMap<>();
 
 	public ButtonClickListener(MatchService matchService) {
 		this.matchService = matchService;
@@ -188,47 +188,45 @@ public class ButtonClickListener extends ListenerAdapter {
 			disableButton(event.getMessage(), "vote_score20_" + matchId);
 		}
 
-		// Check if the majority of users have fully voted
-		Long matchIdLong = Long.parseLong(matchId);
-		List<UserDTO> usersInMatch = matchService.getUsersInMatch(matchIdLong);
-		int totalUsersInMatch = usersInMatch.size();
-		int usersFullyVoted = 0;
-		for (UserVoteDTO vote : userVotes.values()) {
-			if (vote.getTeamVote() != null && vote.getWinningScore() != null && vote.getLosingScore() != null) {
-				usersFullyVoted++;
-			}
-		}
+		// Check if 2 votes have been received and process the results
+		usersFullyVoted.putIfAbsent(matchId, new AtomicInteger(0));
+		if (userVote.getTeamVote() != null && userVote.getWinningScore() != null && userVote.getLosingScore() != null) {
+			if (usersFullyVoted.get(matchId).incrementAndGet() >= 2) {
 
-		// If the majority of users have fully voted, process the results
-		if (usersFullyVoted > totalUsersInMatch / 2) {
-			// Calculate the majority vote for the winning team and score
-			Map<Long, Integer> teamVoteCounts = new HashMap<>();
-			Map<String, Integer> scoreVoteCounts = new HashMap<>();
+				// Calculate the majority vote for the winning team and score
+				Map<Long, Integer> teamVoteCounts = new HashMap<>();
+				Map<String, Integer> scoreVoteCounts = new HashMap<>();
 
-			for (UserVoteDTO vote : userVotes.values()) {
-				if (vote.getTeamVote() != null && vote.getWinningScore() != null && vote.getLosingScore() != null) {
-					teamVoteCounts.put(vote.getTeamVote(), teamVoteCounts.getOrDefault(vote.getTeamVote(), 0) + 1);
-					String scoreVote = vote.getWinningScore() + "-" + vote.getLosingScore();
-					scoreVoteCounts.put(scoreVote, scoreVoteCounts.getOrDefault(scoreVote, 0) + 1);
+				for (UserVoteDTO vote : userVotes.values()) {
+					if (vote.getTeamVote() != null && vote.getWinningScore() != null && vote.getLosingScore() != null) {
+						teamVoteCounts.put(vote.getTeamVote(), teamVoteCounts.getOrDefault(vote.getTeamVote(), 0) + 1);
+						String scoreVote = vote.getWinningScore() + "-" + vote.getLosingScore();
+						scoreVoteCounts.put(scoreVote, scoreVoteCounts.getOrDefault(scoreVote, 0) + 1);
+					}
 				}
+
+				if (teamVoteCounts.isEmpty() || scoreVoteCounts.isEmpty()) {
+					return;
+				}
+
+				long winningTeam = teamVoteCounts.entrySet().stream().max(Map.Entry.comparingByValue()).get().getKey();
+				String winningScore = scoreVoteCounts.entrySet().stream().max(Map.Entry.comparingByValue()).get()
+						.getKey();
+
+				// Update matchResult
+				System.out.println("Match ID: " + matchId);
+				MatchResultDTO matchResult = new MatchResultDTO();
+				System.out.println("Match ID Test2: " + Long.parseLong(matchId));
+				matchResult.setMatchId(Long.parseLong(matchId));
+				matchResult.setWinningTeamId(winningTeam);
+				matchResult.setWinningScore(Integer.parseInt(winningScore.split("-")[0]));
+				matchResult.setLosingScore(Integer.parseInt(winningScore.split("-")[1]));
+
+				// Send the approval request
+				sendApprovalRequest(event, matchResult, matchId);
+				usersFullyVoted.remove(matchId);
+
 			}
-
-			if (teamVoteCounts.isEmpty() || scoreVoteCounts.isEmpty()) {
-				return;
-			}
-
-			long winningTeam = teamVoteCounts.entrySet().stream().max(Map.Entry.comparingByValue()).get().getKey();
-			String winningScore = scoreVoteCounts.entrySet().stream().max(Map.Entry.comparingByValue()).get().getKey();
-
-			// Update matchResult
-			MatchResultDTO matchResult = new MatchResultDTO();
-			matchResult.setMatchId(Long.parseLong(matchId));
-			matchResult.setWinningTeamId(winningTeam);
-			matchResult.setWinningScore(Integer.parseInt(winningScore.split("-")[0]));
-			matchResult.setLosingScore(Integer.parseInt(winningScore.split("-")[1]));
-
-			// Send the approval request
-			sendApprovalRequest(event, matchResult, matchId);
 		}
 	}
 
