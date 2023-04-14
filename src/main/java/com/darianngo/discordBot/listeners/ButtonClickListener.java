@@ -58,44 +58,8 @@ public class ButtonClickListener extends ListenerAdapter {
 			handleApproveButtonClick(event, buttonIdParts);
 		} else if ("reject".equals(action)) {
 			handleRejectButtonClick(event, buttonIdParts);
-		} else if ("admin_vote".equals(action)) {
-			handleAdminVoteButtonClick(event, buttonIdParts);
 		}
 		event.deferEdit().queue();// Acknowledge the event
-	}
-
-	private void handleAdminVoteButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
-		String voteType = buttonIdParts[1];
-		String matchId = buttonIdParts[2];
-		String userVoteKey = event.getUser().getId() + "_" + matchId;
-		if (!adminMatchVoteCounter.containsKey(userVoteKey)) {
-			adminMatchVoteCounter.put(userVoteKey, new AtomicInteger(0));
-		}
-
-		AtomicInteger voteCount = adminMatchVoteCounter.get(userVoteKey);
-
-		MatchResultDTO matchResult = matchResults.get(matchId);
-
-		if ("team1".equals(voteType)) {
-			matchResult.setWinningTeamId(1L);
-		} else if ("team2".equals(voteType)) {
-			matchResult.setWinningTeamId(2L);
-		} else if ("score20".equals(voteType)) {
-			matchResult.setWinningScore(2);
-			matchResult.setLosingScore(0);
-		} else if ("score21".equals(voteType)) {
-			matchResult.setWinningScore(2);
-			matchResult.setLosingScore(1);
-		}
-
-		if (matchResult.getWinningTeamId() != null && matchResult.getWinningScore() != null) {
-			voteCount.incrementAndGet();
-
-			if (voteCount.get() >= 2) {
-				event.getMessage().delete().queue();
-				sendApprovalRequest(event, matchResult);
-			}
-		}
 	}
 
 	private void handleEndButtonClick(ButtonClickEvent event) {
@@ -129,7 +93,6 @@ public class ButtonClickListener extends ListenerAdapter {
 	private void handleRejectButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
 		String matchId = buttonIdParts[1];
 		MatchResultDTO matchResult = matchResults.get(matchId);
-		event.getMessage().delete().queue();
 
 		User user = event.getUser();
 		sendAdminVotingDM(user, matchId, matchResult);
@@ -225,8 +188,19 @@ public class ButtonClickListener extends ListenerAdapter {
 			disableButton(event.getMessage(), "vote_score20_" + matchId);
 		}
 
-		// Check if 2 votes have been received and process the results
-		if (userVotes.size() >= 2) {
+		// Check if the majority of users have fully voted
+		Long matchIdLong = Long.parseLong(matchId);
+		List<UserDTO> usersInMatch = matchService.getUsersInMatch(matchIdLong);
+		int totalUsersInMatch = usersInMatch.size();
+		int usersFullyVoted = 0;
+		for (UserVoteDTO vote : userVotes.values()) {
+			if (vote.getTeamVote() != null && vote.getWinningScore() != null && vote.getLosingScore() != null) {
+				usersFullyVoted++;
+			}
+		}
+
+		// If the majority of users have fully voted, process the results
+		if (usersFullyVoted > totalUsersInMatch / 2) {
 			// Calculate the majority vote for the winning team and score
 			Map<Long, Integer> teamVoteCounts = new HashMap<>();
 			Map<String, Integer> scoreVoteCounts = new HashMap<>();
@@ -247,36 +221,29 @@ public class ButtonClickListener extends ListenerAdapter {
 			String winningScore = scoreVoteCounts.entrySet().stream().max(Map.Entry.comparingByValue()).get().getKey();
 
 			// Update matchResult
-			System.out.println("Match ID: " + matchId);
 			MatchResultDTO matchResult = new MatchResultDTO();
-			System.out.println("Match ID Test2: " + Long.parseLong(matchId));
 			matchResult.setMatchId(Long.parseLong(matchId));
 			matchResult.setWinningTeamId(winningTeam);
 			matchResult.setWinningScore(Integer.parseInt(winningScore.split("-")[0]));
 			matchResult.setLosingScore(Integer.parseInt(winningScore.split("-")[1]));
 
 			// Send the approval request
-			sendApprovalRequest(event, matchResult);
+			sendApprovalRequest(event, matchResult, matchId);
 		}
 	}
 
-	private void sendApprovalRequest(ButtonClickEvent event, MatchResultDTO matchResult) {
+	private void sendApprovalRequest(ButtonClickEvent event, MatchResultDTO matchResult, String matchId) {
 		MessageChannel approvalChannel = event.getJDA().getTextChannelById(discordChannelConfig.getApprovalChannelId());
-		System.out.println("Match ID inside of Approval Request: " + matchResult.getMatchId());
 		EmbedBuilder embedBuilder = new EmbedBuilder();
 		embedBuilder.setTitle("Match Result Approval");
-		embedBuilder.setDescription("Please approve or reject the match result");
+		embedBuilder.setDescription("Please approve or reject the match result for match ID: " + matchId);
 		embedBuilder.setColor(Color.YELLOW);
 		embedBuilder.addField("Winning Team", "Team " + matchResult.getWinningTeamId(), true);
 		embedBuilder.addField("Score", matchResult.getWinningScore() + "-" + matchResult.getLosingScore(), true);
-
 		MessageEmbed embed = embedBuilder.build();
-
-		ActionRow actionRow = ActionRow.of(Button.success("approve_" + matchResult.getMatchId(), "✅"),
-				Button.danger("reject_" + matchResult.getMatchId(), "❌"));
-
+		ActionRow actionRow = ActionRow.of(Button.success("approve_" + matchId, "✅"),
+				Button.danger("reject_" + matchId, "❌"));
 		approvalChannel.sendMessageEmbeds(embed).setActionRows(Collections.singletonList(actionRow)).queue();
-
 	}
 
 	private void disableButton(Message message, String buttonIdToDisable) {

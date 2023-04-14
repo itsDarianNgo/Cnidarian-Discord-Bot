@@ -124,6 +124,7 @@ public class MatchServiceImpl implements MatchService {
 		return matchRepository.findById(matchId)
 				.orElseThrow(() -> new EntityNotFoundException("Match not found with ID: " + matchId));
 	}
+
 	@Override
 	public List<UserDTO> getUsersInMatch(Long matchId) {
 		List<UserTeamEntity> userTeamEntities = userTeamRepository.findByTeamMatchId(matchId);
