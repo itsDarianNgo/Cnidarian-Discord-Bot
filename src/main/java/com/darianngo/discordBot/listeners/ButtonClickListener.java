@@ -17,6 +17,7 @@ import com.darianngo.discordBot.config.DiscordChannelConfig;
 import com.darianngo.discordBot.dtos.MatchResultDTO;
 import com.darianngo.discordBot.dtos.UserDTO;
 import com.darianngo.discordBot.dtos.UserVoteDTO;
+import com.darianngo.discordBot.embeds.FinalResultEmbed;
 import com.darianngo.discordBot.services.MatchService;
 import com.darianngo.discordBot.services.VotingService;
 
@@ -102,10 +103,12 @@ public class ButtonClickListener extends ListenerAdapter {
 		matchResult.setWinningTeamId(userVote.getTeamVote());
 		matchResult.setWinningScore(userVote.getWinningScore());
 		matchResult.setLosingScore(userVote.getLosingScore());
-
-		matchService.saveMatchResult(matchResult); // Save the results to the database
-		displayFinalResult(event.getChannel(), matchResult); // Display the final results
-
+		// Save the results to the database
+		matchService.saveMatchResult(matchResult);
+		// Display the final results in current channel
+		event.getChannel().sendMessageEmbeds(FinalResultEmbed.createEmbed(matchResult)).queue();
+		// Display the final results in match channel
+		matchService.sendMatchResultToDesignatedChannel(matchResult);
 		// Delete the message
 		event.getMessage().delete().queue();
 	}
@@ -154,8 +157,10 @@ public class ButtonClickListener extends ListenerAdapter {
 			matchResult.setLosingScore(userVote.getLosingScore());
 
 			matchService.saveMatchResult(matchResult); // Save the results to the database
-			// Display final results
-			displayFinalResult(event.getChannel(), matchResult);
+			// Display the final results in current channel
+			event.getChannel().sendMessageEmbeds(FinalResultEmbed.createEmbed(matchResult)).queue();
+			// Display the final results in match channel
+			matchService.sendMatchResultToDesignatedChannel(matchResult);
 
 			// Remove the vote from adminUserVotes after processing
 			adminUserVotes.remove(userVoteKey);
@@ -264,18 +269,6 @@ public class ButtonClickListener extends ListenerAdapter {
 		}
 
 		message.editMessageComponents(updatedActionRows).queue();
-	}
-
-	private void displayFinalResult(MessageChannel channel, MatchResultDTO matchResult) {
-		EmbedBuilder embedBuilder = new EmbedBuilder();
-		embedBuilder.setTitle("Final Match Result");
-		embedBuilder.setDescription("The final result for match " + matchResult.getMatchId() + " is:");
-		embedBuilder.addField("Winning Team", "Team " + matchResult.getWinningTeamId(), false);
-		embedBuilder.addField("Score", matchResult.getWinningScore() + "-" + matchResult.getLosingScore(), false);
-		embedBuilder.setColor(Color.GREEN);
-
-		MessageEmbed embed = embedBuilder.build();
-		channel.sendMessageEmbeds(embed).queue();
 	}
 
 }

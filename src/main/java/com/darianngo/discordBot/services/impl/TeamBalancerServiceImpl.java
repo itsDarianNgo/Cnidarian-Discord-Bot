@@ -6,6 +6,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import com.darianngo.discordBot.dtos.UserDTO;
@@ -20,10 +22,15 @@ import net.dv8tion.jda.api.entities.MessageEmbed;
 public class TeamBalancerServiceImpl implements TeamBalancerService {
 
 	private final UserService userService;
-	private final MatchService matchService;
+	private MatchService matchService;
 
-	public TeamBalancerServiceImpl(UserService userService, MatchService matchService) {
+	@Autowired
+	public TeamBalancerServiceImpl(UserService userService) {
 		this.userService = userService;
+	}
+
+	@Autowired
+	public void setMatchService(@Lazy MatchService matchService) {
 		this.matchService = matchService;
 	}
 
@@ -70,12 +77,12 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 			}
 		}
 // Build Embed
-	    int eloDifference = Math.abs(calculateTeamScore(team1) - calculateTeamScore(team2));
-	    // Save teams to the database
-	    matchService.saveTeamsWithMatchId(team1, team2, matchId);
+		int eloDifference = Math.abs(calculateTeamScore(team1) - calculateTeamScore(team2));
+		// Save teams to the database
+		matchService.saveTeamsWithMatchId(team1, team2, matchId);
 
-	    return TeamBalancerEmbed.createEmbed(team1, team2, eloDifference, matchId);
-	    }
+		return TeamBalancerEmbed.createEmbed(team1, team2, eloDifference, matchId);
+	}
 
 	// Create a custom game
 	// try {

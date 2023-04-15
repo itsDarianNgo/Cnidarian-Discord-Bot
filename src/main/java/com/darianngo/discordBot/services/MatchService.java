@@ -30,4 +30,6 @@ public interface MatchService {
 
 	MatchEntity getMatchEntityById(Long matchId);
 
+	void sendMatchResultToDesignatedChannel(MatchResultDTO matchResult);
+
 }

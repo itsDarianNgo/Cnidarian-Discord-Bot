@@ -7,11 +7,14 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
+import com.darianngo.discordBot.config.DiscordChannelConfig;
 import com.darianngo.discordBot.dtos.MatchDTO;
 import com.darianngo.discordBot.dtos.MatchResultDTO;
 import com.darianngo.discordBot.dtos.UserDTO;
+import com.darianngo.discordBot.embeds.FinalResultEmbed;
 import com.darianngo.discordBot.entities.MatchEntity;
 import com.darianngo.discordBot.entities.MatchResultEntity;
 import com.darianngo.discordBot.entities.TeamEntity;
@@ -33,6 +36,8 @@ import jakarta.persistence.EntityGraph;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.MessageChannel;
 
 @Service
 public class MatchServiceImpl implements MatchService {
@@ -42,6 +47,12 @@ public class MatchServiceImpl implements MatchService {
 	private final UserRepository userRepository;
 	private final MatchResultRepository matchResultRepository;
 	private final UserMapper userMapper;
+	private JDA jda;
+
+	@Autowired
+	public void setJDA(@Lazy JDA jda) {
+		this.jda = jda;
+	}
 
 	@Autowired
 	private UserTeamRepository userTeamRepository;
@@ -51,6 +62,8 @@ public class MatchServiceImpl implements MatchService {
 	private TeamMapper teamMapper;
 	@Autowired
 	private EntityManager entityManager;
+	@Autowired
+	private DiscordChannelConfig discordChannelConfig;
 
 	public MatchServiceImpl(MatchRepository matchRepository, MatchMapper matchMapper, UserRepository userRepository,
 			MatchResultRepository matchResultRepository, MatchResultMapper matchResultMapper, UserMapper userMapper) {
@@ -182,6 +195,17 @@ public class MatchServiceImpl implements MatchService {
 		}
 
 		return teamMembers;
+	}
+
+	@Override
+	public void sendMatchResultToDesignatedChannel(MatchResultDTO matchResult) {
+		MessageChannel designatedChannel = jda.getTextChannelById(discordChannelConfig.getMatchChannelId());
+		if (designatedChannel == null) {
+			System.out.println("Error: Designated channel not found.");
+			return;
+		}
+
+		designatedChannel.sendMessageEmbeds(FinalResultEmbed.createEmbed(matchResult)).queue();
 	}
 
 }

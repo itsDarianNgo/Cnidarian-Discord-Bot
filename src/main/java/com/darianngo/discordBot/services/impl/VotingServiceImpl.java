@@ -22,10 +22,12 @@ import com.darianngo.discordBot.services.MatchService;
 import com.darianngo.discordBot.services.VotingService;
 
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.ButtonClickEvent;
+import net.dv8tion.jda.api.interactions.components.ActionRow;
 import net.dv8tion.jda.api.interactions.components.Button;
 import net.dv8tion.jda.api.interactions.components.Component;
 
@@ -108,10 +110,16 @@ public class VotingServiceImpl implements VotingService {
 		components.add(Button.primary("vote_score21_" + matchId, "2-1"));
 
 		user.openPrivateChannel().queue(privateChannel -> {
-			privateChannel.sendMessageEmbeds(embed).setActionRow(components).queue();
+			privateChannel.sendMessageEmbeds(embed).setActionRow(components).queue(message -> {
+				// Schedule a task to disable the buttons after 10 minutes
+				executorService.schedule(() -> {
+					disableButtons(message);
+				}, 10, TimeUnit.MINUTES);
+			});
 		});
 	}
 
+// Helper methods
 	private MessageEmbed buildEmbed(String matchId, Map<Long, List<UserDTO>> teamMembers) {
 		EmbedBuilder embedBuilder = new EmbedBuilder();
 		embedBuilder.setTitle("Vote for the winning team and score");
@@ -132,5 +140,27 @@ public class VotingServiceImpl implements VotingService {
 		}
 
 		return embedBuilder.build();
+	}
+
+	private void disableButtons(Message message) {
+		List<ActionRow> updatedActionRows = new ArrayList<>();
+
+		for (ActionRow actionRow : message.getActionRows()) {
+			List<Component> updatedComponents = new ArrayList<>();
+
+			for (Component component : actionRow.getComponents()) {
+				if (component instanceof Button) {
+					Button button = (Button) component;
+					updatedComponents
+							.add(Button.of(button.getStyle(), button.getId(), button.getLabel()).withDisabled(true));
+				} else {
+					updatedComponents.add(component);
+				}
+			}
+
+			updatedActionRows.add(ActionRow.of(updatedComponents));
+		}
+
+		message.editMessageComponents(updatedActionRows).queue();
 	}
 }
