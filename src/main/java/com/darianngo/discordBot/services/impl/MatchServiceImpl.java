@@ -45,7 +45,6 @@ public class MatchServiceImpl implements MatchService {
 
 	@Autowired
 	private UserTeamRepository userTeamRepository;
-
 	@Autowired
 	private TeamRepository teamRepository;
 	@Autowired

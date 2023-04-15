@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,14 +17,13 @@ import com.darianngo.discordBot.config.DiscordChannelConfig;
 import com.darianngo.discordBot.dtos.MatchResultDTO;
 import com.darianngo.discordBot.dtos.UserDTO;
 import com.darianngo.discordBot.dtos.UserVoteDTO;
-import com.darianngo.discordBot.entities.MatchEntity;
 import com.darianngo.discordBot.services.MatchService;
+import com.darianngo.discordBot.services.VotingService;
 
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageChannel;
 import net.dv8tion.jda.api.entities.MessageEmbed;
-import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.ButtonClickEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -36,14 +34,16 @@ import net.dv8tion.jda.api.interactions.components.Component;
 @org.springframework.stereotype.Component
 public class ButtonClickListener extends ListenerAdapter {
 	private final MatchService matchService;
+	private final VotingService votingService;
 	private Map<String, UserVoteDTO> userVotes = new ConcurrentHashMap<>();
 	private final Map<String, MatchResultDTO> matchResults = new HashMap<>();
 	private final Map<String, AtomicInteger> usersFullyVoted = new ConcurrentHashMap<>();
 	private Map<String, UserVoteDTO> adminUserVotes = new ConcurrentHashMap<>();
 	private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 
-	public ButtonClickListener(MatchService matchService) {
+	public ButtonClickListener(MatchService matchService, VotingService votingService) {
 		this.matchService = matchService;
+		this.votingService = votingService;
 	}
 
 	@Autowired
@@ -85,10 +85,10 @@ public class ButtonClickListener extends ListenerAdapter {
 
 		for (UserDTO userDTO : usersReacted) {
 			User user = event.getJDA().retrieveUserById(userDTO.getDiscordId()).complete();
-			sendVotingDM(user, matchId);
+			votingService.sendVotingDM(user, matchId);
 		}
 		// Start 5-minute countdown
-		startVoteCountdown(event, matchId);
+		votingService.startVoteCountdown(event, matchId);
 
 		// Disable the "End Match" button
 		disableButton(event.getMessage(), "end_match_" + matchId);
@@ -115,69 +115,10 @@ public class ButtonClickListener extends ListenerAdapter {
 		MatchResultDTO matchResult = matchResults.get(matchId);
 
 		User user = event.getUser();
-		sendAdminVoting(user, matchId, matchResult);
+		votingService.sendAdminVoting(user, matchId, matchResult);
 
 		// Delete the message
 		event.getMessage().delete().queue();
-	}
-
-	private void sendVotingDM(User user, String matchId) {
-		Long matchIdLong = Long.parseLong(matchId);
-		MatchEntity matchEntity = matchService.getMatchEntityById(matchIdLong);
-		Map<Long, List<UserDTO>> teamMembers = matchService.getTeamMembers(matchEntity.getTeams());
-
-		MessageEmbed embed = buildEmbed(matchId, teamMembers);
-
-		List<Component> components = new ArrayList<>();
-		components.add(Button.primary("vote_team1_" + matchId, "Team 1"));
-		components.add(Button.primary("vote_team2_" + matchId, "Team 2"));
-		components.add(Button.primary("vote_score20_" + matchId, "2-0"));
-		components.add(Button.primary("vote_score21_" + matchId, "2-1"));
-
-		user.openPrivateChannel().queue(privateChannel -> {
-			privateChannel.sendMessageEmbeds(embed).setActionRow(components).queue();
-		});
-	}
-
-	private void sendAdminVoting(User admin, String matchId, MatchResultDTO matchResult) {
-		Map<Long, List<UserDTO>> teamMembers = matchService
-				.getTeamMembers(matchService.getMatchEntityById(Long.parseLong(matchId)).getTeams());
-
-		EmbedBuilder embedBuilder = new EmbedBuilder();
-		embedBuilder.setTitle("Vote has been rejected");
-		embedBuilder.setDescription("Choose the CORRECT winning team and score for match: " + matchId + "\n\n");
-		embedBuilder.setColor(Color.CYAN);
-
-		int teamNumber = 1;
-		for (Map.Entry<Long, List<UserDTO>> entry : teamMembers.entrySet()) {
-			StringBuilder teamDescription = new StringBuilder();
-			List<String> memberNames = new ArrayList<>();
-			for (UserDTO userDTO : entry.getValue()) {
-				memberNames.add("@" + userDTO.getDiscordName());
-			}
-			teamDescription.append(String.join(", ", memberNames));
-
-			embedBuilder.addField("Team " + teamNumber, teamDescription.toString(), true);
-			teamNumber++;
-		}
-
-		List<Component> components = new ArrayList<>();
-		components.add(Button.primary("admin_vote_team1_" + matchId, "Team 1"));
-		components.add(Button.primary("admin_vote_team2_" + matchId, "Team 2"));
-		components.add(Button.primary("admin_vote_score20_" + matchId, "2-0"));
-		components.add(Button.primary("admin_vote_score21_" + matchId, "2-1"));
-
-		String approvalChannelId = discordChannelConfig.getApprovalChannelId();
-		TextChannel approvalChannel = admin.getJDA().getTextChannelById(approvalChannelId);
-
-		// Build the embed from the embedBuilder
-		MessageEmbed embed = embedBuilder.build();
-
-		if (approvalChannel != null) {
-			approvalChannel.sendMessageEmbeds(embed).setActionRow(components).queue();
-		} else {
-			System.out.println("Error: Approval channel not found.");
-		}
 	}
 
 	private void handleAdminVoteButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
@@ -219,28 +160,6 @@ public class ButtonClickListener extends ListenerAdapter {
 			// Remove the vote from adminUserVotes after processing
 			adminUserVotes.remove(userVoteKey);
 		}
-	}
-
-	private MessageEmbed buildEmbed(String matchId, Map<Long, List<UserDTO>> teamMembers) {
-		EmbedBuilder embedBuilder = new EmbedBuilder();
-		embedBuilder.setTitle("Vote for the winning team and score");
-		embedBuilder.setDescription("Please select the winning team and score for match: " + matchId + "\n\n");
-		embedBuilder.setColor(Color.CYAN);
-
-		int teamNumber = 1;
-		for (Map.Entry<Long, List<UserDTO>> entry : teamMembers.entrySet()) {
-			StringBuilder teamDescription = new StringBuilder();
-			List<String> memberNames = new ArrayList<>();
-			for (UserDTO userDTO : entry.getValue()) {
-				memberNames.add("@" + userDTO.getDiscordName());
-			}
-			teamDescription.append(String.join(", ", memberNames));
-
-			embedBuilder.addField("Team " + teamNumber, teamDescription.toString(), true);
-			teamNumber++;
-		}
-
-		return embedBuilder.build();
 	}
 
 	private void handleVoteButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
@@ -357,16 +276,6 @@ public class ButtonClickListener extends ListenerAdapter {
 
 		MessageEmbed embed = embedBuilder.build();
 		channel.sendMessageEmbeds(embed).queue();
-	}
-
-	private void startVoteCountdown(ButtonClickEvent event, String matchId) {
-		executorService.schedule(() -> {
-			if (usersFullyVoted.get(matchId) == null || usersFullyVoted.get(matchId).get() < 2) {
-				// Send admin voting message if no majority vote or tie within 5 minutes
-				User admin = event.getJDA().retrieveUserById(event.getUser().getId()).complete();
-				sendAdminVoting(admin, matchId, matchResults.get(matchId));
-			}
-		}, 1, TimeUnit.MINUTES);
 	}
 
 }
