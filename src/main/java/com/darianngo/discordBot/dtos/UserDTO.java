@@ -18,4 +18,6 @@ public class UserDTO {
 	private Integer elo;
 	private Integer recentEloChange;
 	private Integer totalMatches;
+	private Integer wins;
+	private Integer losses;
 }

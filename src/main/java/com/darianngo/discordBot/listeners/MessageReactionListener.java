@@ -18,6 +18,7 @@ import com.darianngo.discordBot.commands.SetUserRolesCommand;
 import com.darianngo.discordBot.config.DiscordChannelConfig;
 import com.darianngo.discordBot.dtos.MatchDTO;
 import com.darianngo.discordBot.dtos.UserDTO;
+import com.darianngo.discordBot.services.MatchResultService;
 import com.darianngo.discordBot.services.MatchService;
 import com.darianngo.discordBot.services.TeamBalancerService;
 import com.darianngo.discordBot.services.UserService;
@@ -31,6 +32,8 @@ import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.interactions.components.ActionRow;
+import net.dv8tion.jda.api.interactions.components.Button;
 
 @Component
 public class MessageReactionListener extends ListenerAdapter {
@@ -38,14 +41,17 @@ public class MessageReactionListener extends ListenerAdapter {
 	private final UserService userService;
 	private final TeamBalancerService teamBalancerService;
 	private final MatchService matchService;
+	private final MatchResultService matchResultService;
+
 	@Autowired
 	private DiscordChannelConfig discordChannelConfig;
 
 	public MessageReactionListener(UserService userService, TeamBalancerService teamBalancerService,
-			MatchService matchService) {
+			MatchService matchService, MatchResultService matchResultService) {
 		this.userService = userService;
 		this.teamBalancerService = teamBalancerService;
 		this.matchService = matchService;
+		this.matchResultService = matchResultService;
 	}
 
 	@Override
@@ -82,7 +88,7 @@ public class MessageReactionListener extends ListenerAdapter {
 				int realUsersCount = reactionCount - 1;
 
 				// Check if the number of real users who reacted is 10 or less
-				if (realUsersCount == 4) {
+				if (realUsersCount == 2) {
 					List<String> reactions = Collections.singletonList("👍");
 					List<UserDTO> usersReacted = new ArrayList<>();
 
@@ -109,13 +115,16 @@ public class MessageReactionListener extends ListenerAdapter {
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
+
 					sendMatchApprovalRequest(event, usersReacted, approvalRequest -> waitForApproval(event,
 							approvalRequest.getId(), reactions, usersReacted));
 
 				}
+
 			});
 		}
 	}
+
 
 	private void sendMatchApprovalRequest(MessageReactionAddEvent event, List<UserDTO> usersReacted,
 			Consumer<Message> callback) {
@@ -162,9 +171,12 @@ public class MessageReactionListener extends ListenerAdapter {
 					// Create a match when the approval reaction is "✅"
 					MatchDTO match = matchService.createMatch(new MatchDTO());
 					Long matchId = match.getId();
-
+					//Balance teams
 					MessageEmbed embed = teamBalancerService.balanceTeams(reactions, usersReacted, matchId);
-					event.getChannel().sendMessage(embed).queue();
+					//Create button for ending match and sending DMs to users to vote on results
+					ActionRow actionRow = ActionRow.of(Button.primary("end_match_" + matchId, "End Match: " + matchId));
+					event.getChannel().sendMessageEmbeds(embed).setActionRows(actionRow).queue();
+
 				} else if (approvalEvent.getReactionEmote().getEmoji().equals("❌")) {
 					event.getChannel().sendMessage("Match creation request rejected.").queue();
 				}
@@ -172,6 +184,6 @@ public class MessageReactionListener extends ListenerAdapter {
 				event.getJDA().removeEventListener(this);
 			}
 		});
-	}
 
+	}
 }

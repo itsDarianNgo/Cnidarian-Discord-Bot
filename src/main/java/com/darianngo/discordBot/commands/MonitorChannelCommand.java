@@ -1,10 +1,10 @@
 package com.darianngo.discordBot.commands;
 
-import net.dv8tion.jda.api.Permission;
-import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
-
 import java.util.HashSet;
 import java.util.Set;
+
+import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 
 public class MonitorChannelCommand {
     private static Set<String> monitoredChannelIds = new HashSet<>();

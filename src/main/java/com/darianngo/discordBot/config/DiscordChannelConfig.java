@@ -12,4 +12,11 @@ public class DiscordChannelConfig {
 	public String getApprovalChannelId() {
 		return approvalChannelId;
 	}
+	
+	@Value("${matchChannelId}")
+	private String matchChannelId;
+
+	public String getMatchChannelId() {
+		return matchChannelId;
+	}
 }
