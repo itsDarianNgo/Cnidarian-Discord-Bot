@@ -2,7 +2,6 @@ package com.darianngo.discordBot.listeners;
 
 import java.awt.Color;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -58,8 +57,10 @@ public class ButtonClickListener extends ListenerAdapter {
 			handleApproveButtonClick(event, buttonIdParts);
 		} else if ("reject".equals(action)) {
 			handleRejectButtonClick(event, buttonIdParts);
+		} else if ("admin".equals(action)) {
+			handleAdminVoteButtonClick(event, buttonIdParts);
 		}
-		event.deferEdit().queue();// Acknowledge the event
+		event.deferEdit().queue(); // Acknowledge the event
 	}
 
 	private void handleEndButtonClick(ButtonClickEvent event) {
@@ -97,6 +98,9 @@ public class ButtonClickListener extends ListenerAdapter {
 
 		matchService.saveMatchResult(matchResult); // Save the results to the database
 		displayFinalResult(event.getChannel(), matchResult); // Display the final results
+
+		// Delete the message
+		event.getMessage().delete().queue();
 	}
 
 	private void handleRejectButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
@@ -104,16 +108,16 @@ public class ButtonClickListener extends ListenerAdapter {
 		MatchResultDTO matchResult = matchResults.get(matchId);
 
 		User user = event.getUser();
-		sendAdminVotingDM(user, matchId, matchResult);
+		sendAdminVoting(user, matchId, matchResult);
+
+		// Delete the message
+		event.getMessage().delete().queue();
 	}
 
 	private void sendVotingDM(User user, String matchId) {
 		Long matchIdLong = Long.parseLong(matchId);
 		MatchEntity matchEntity = matchService.getMatchEntityById(matchIdLong);
 		Map<Long, List<UserDTO>> teamMembers = matchService.getTeamMembers(matchEntity.getTeams());
-
-		// Log the value of matchId
-		System.out.println("matchId: " + matchId);
 
 		MessageEmbed embed = buildEmbed(matchId, teamMembers);
 
@@ -128,11 +132,27 @@ public class ButtonClickListener extends ListenerAdapter {
 		});
 	}
 
-	private void sendAdminVotingDM(User admin, String matchId, MatchResultDTO matchResult) {
+	private void sendAdminVoting(User admin, String matchId, MatchResultDTO matchResult) {
 		Map<Long, List<UserDTO>> teamMembers = matchService
 				.getTeamMembers(matchService.getMatchEntityById(Long.parseLong(matchId)).getTeams());
 
-		MessageEmbed embed = buildEmbed(matchId, teamMembers);
+		EmbedBuilder embedBuilder = new EmbedBuilder();
+		embedBuilder.setTitle("Vote has been rejected");
+		embedBuilder.setDescription("Choose the CORRECT winning team and score for match: " + matchId + "\n\n");
+		embedBuilder.setColor(Color.CYAN);
+
+		int teamNumber = 1;
+		for (Map.Entry<Long, List<UserDTO>> entry : teamMembers.entrySet()) {
+			StringBuilder teamDescription = new StringBuilder();
+			List<String> memberNames = new ArrayList<>();
+			for (UserDTO userDTO : entry.getValue()) {
+				memberNames.add("@" + userDTO.getDiscordName());
+			}
+			teamDescription.append(String.join(", ", memberNames));
+
+			embedBuilder.addField("Team " + teamNumber, teamDescription.toString(), true);
+			teamNumber++;
+		}
 
 		List<Component> components = new ArrayList<>();
 		components.add(Button.primary("admin_vote_team1_" + matchId, "Team 1"));
@@ -143,10 +163,59 @@ public class ButtonClickListener extends ListenerAdapter {
 		String approvalChannelId = discordChannelConfig.getApprovalChannelId();
 		TextChannel approvalChannel = admin.getJDA().getTextChannelById(approvalChannelId);
 
+		// Build the embed from the embedBuilder
+		MessageEmbed embed = embedBuilder.build();
+
 		if (approvalChannel != null) {
 			approvalChannel.sendMessageEmbeds(embed).setActionRow(components).queue();
 		} else {
 			System.out.println("Error: Approval channel not found.");
+		}
+	}
+
+	private void handleAdminVoteButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
+		System.out.println("Handling admin vote button click: " + event.getComponent().getId());
+
+		String voteType = buttonIdParts[2];
+		String matchId = buttonIdParts[3];
+		String userVoteKey = event.getUser().getId() + "_" + matchId;
+		UserVoteDTO userVote = userVotes.getOrDefault(userVoteKey, new UserVoteDTO());
+		userVotes.put(userVoteKey, userVote);
+		
+		if ("team1".equals(voteType)) {
+			System.out.println("test on Click");
+			userVote.setTeamVote(1L);
+			disableButton(event.getMessage(), "admin_vote_team2_" + matchId);
+		} else if ("team2".equals(voteType)) {
+			userVote.setTeamVote(2L);
+			disableButton(event.getMessage(), "admin_vote_team1_" + matchId);
+		} else if ("score20".equals(voteType)) {
+			userVote.setWinningScore(2);
+			userVote.setLosingScore(0);
+			disableButton(event.getMessage(), "admin_vote_score21_" + matchId);
+		} else if ("score21".equals(voteType)) {
+			userVote.setWinningScore(2);
+			userVote.setLosingScore(1);
+			disableButton(event.getMessage(), "admin_vote_score20_" + matchId);
+		}
+
+		// Check if 1 full vote has been received and process the results
+		if (userVote.getTeamVote() != null && userVote.getWinningScore() != null && userVote.getLosingScore() != null) {
+
+			// Update matchResult
+			System.out.println("Match ID: " + matchId);
+			MatchResultDTO matchResult = new MatchResultDTO();
+			System.out.println("Match ID Test2: " + Long.parseLong(matchId));
+			matchResult.setMatchId(Long.parseLong(matchId));
+			matchResult.setWinningTeamId(userVote.getTeamVote());
+			matchResult.setWinningScore(userVote.getWinningScore());
+			matchResult.setLosingScore(userVote.getLosingScore());
+
+			// Display final results
+			displayFinalResult(event.getChannel(), matchResult);
+
+			// Remove the vote from userVotes after processing
+			userVotes.remove(userVoteKey);
 		}
 	}
 
@@ -173,8 +242,6 @@ public class ButtonClickListener extends ListenerAdapter {
 	}
 
 	private void handleVoteButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
-		System.out.println("Button ID Parts: " + Arrays.toString(buttonIdParts));
-
 		String voteType = buttonIdParts[1];
 		String matchId = buttonIdParts[2];
 		String userVoteKey = event.getUser().getId() + "_" + matchId;
@@ -254,11 +321,12 @@ public class ButtonClickListener extends ListenerAdapter {
 	}
 
 	private void disableButton(Message message, String buttonIdToDisable) {
-		List<Component> updatedComponents = new ArrayList<>();
+		List<ActionRow> updatedActionRows = new ArrayList<>();
 
 		for (ActionRow actionRow : message.getActionRows()) {
-			for (Component component : actionRow.getComponents()) {
+			List<Component> updatedComponents = new ArrayList<>();
 
+			for (Component component : actionRow.getComponents()) {
 				if (component.getId().equals(buttonIdToDisable)) {
 					Button button = (Button) component;
 					updatedComponents
@@ -267,9 +335,11 @@ public class ButtonClickListener extends ListenerAdapter {
 					updatedComponents.add(component);
 				}
 			}
+
+			updatedActionRows.add(ActionRow.of(updatedComponents));
 		}
 
-		message.editMessageComponents(ActionRow.of(updatedComponents)).queue();
+		message.editMessageComponents(updatedActionRows).queue();
 	}
 
 	private void displayFinalResult(MessageChannel channel, MatchResultDTO matchResult) {
