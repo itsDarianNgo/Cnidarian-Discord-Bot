@@ -216,9 +216,7 @@ public class ButtonClickListener extends ListenerAdapter {
 						.getKey();
 
 				// Update matchResult
-				System.out.println("Match ID: " + matchId);
 				MatchResultDTO matchResult = new MatchResultDTO();
-				System.out.println("Match ID Test2: " + Long.parseLong(matchId));
 				matchResult.setMatchId(Long.parseLong(matchId));
 				matchResult.setWinningTeamId(winningTeam);
 				matchResult.setWinningScore(Integer.parseInt(winningScore.split("-")[0]));
