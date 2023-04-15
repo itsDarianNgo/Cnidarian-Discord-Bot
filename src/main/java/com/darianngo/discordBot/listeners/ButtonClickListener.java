@@ -7,6 +7,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +39,8 @@ public class ButtonClickListener extends ListenerAdapter {
 	private Map<String, UserVoteDTO> userVotes = new ConcurrentHashMap<>();
 	private final Map<String, MatchResultDTO> matchResults = new HashMap<>();
 	private final Map<String, AtomicInteger> usersFullyVoted = new ConcurrentHashMap<>();
+	private Map<String, UserVoteDTO> adminUserVotes = new ConcurrentHashMap<>();
+	private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 
 	public ButtonClickListener(MatchService matchService) {
 		this.matchService = matchService;
@@ -82,6 +87,8 @@ public class ButtonClickListener extends ListenerAdapter {
 			User user = event.getJDA().retrieveUserById(userDTO.getDiscordId()).complete();
 			sendVotingDM(user, matchId);
 		}
+		// Start 5-minute countdown
+		startVoteCountdown(event, matchId);
 
 		// Disable the "End Match" button
 		disableButton(event.getMessage(), "end_match_" + matchId);
@@ -174,16 +181,13 @@ public class ButtonClickListener extends ListenerAdapter {
 	}
 
 	private void handleAdminVoteButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
-		System.out.println("Handling admin vote button click: " + event.getComponent().getId());
-
 		String voteType = buttonIdParts[2];
 		String matchId = buttonIdParts[3];
 		String userVoteKey = event.getUser().getId() + "_" + matchId;
-		UserVoteDTO userVote = userVotes.getOrDefault(userVoteKey, new UserVoteDTO());
-		userVotes.put(userVoteKey, userVote);
-		
+		UserVoteDTO userVote = adminUserVotes.getOrDefault(userVoteKey, new UserVoteDTO());
+		adminUserVotes.put(userVoteKey, userVote);
+
 		if ("team1".equals(voteType)) {
-			System.out.println("test on Click");
 			userVote.setTeamVote(1L);
 			disableButton(event.getMessage(), "admin_vote_team2_" + matchId);
 		} else if ("team2".equals(voteType)) {
@@ -201,21 +205,19 @@ public class ButtonClickListener extends ListenerAdapter {
 
 		// Check if 1 full vote has been received and process the results
 		if (userVote.getTeamVote() != null && userVote.getWinningScore() != null && userVote.getLosingScore() != null) {
-
 			// Update matchResult
-			System.out.println("Match ID: " + matchId);
 			MatchResultDTO matchResult = new MatchResultDTO();
-			System.out.println("Match ID Test2: " + Long.parseLong(matchId));
 			matchResult.setMatchId(Long.parseLong(matchId));
 			matchResult.setWinningTeamId(userVote.getTeamVote());
 			matchResult.setWinningScore(userVote.getWinningScore());
 			matchResult.setLosingScore(userVote.getLosingScore());
 
+			matchService.saveMatchResult(matchResult); // Save the results to the database
 			// Display final results
 			displayFinalResult(event.getChannel(), matchResult);
 
-			// Remove the vote from userVotes after processing
-			userVotes.remove(userVoteKey);
+			// Remove the vote from adminUserVotes after processing
+			adminUserVotes.remove(userVoteKey);
 		}
 	}
 
@@ -302,6 +304,9 @@ public class ButtonClickListener extends ListenerAdapter {
 				sendApprovalRequest(event, matchResult, matchId);
 				usersFullyVoted.remove(matchId);
 
+				// Cancel scheduled admin voting
+				executorService.shutdown();
+
 			}
 		}
 	}
@@ -352,6 +357,16 @@ public class ButtonClickListener extends ListenerAdapter {
 
 		MessageEmbed embed = embedBuilder.build();
 		channel.sendMessageEmbeds(embed).queue();
+	}
+
+	private void startVoteCountdown(ButtonClickEvent event, String matchId) {
+		executorService.schedule(() -> {
+			if (usersFullyVoted.get(matchId) == null || usersFullyVoted.get(matchId).get() < 2) {
+				// Send admin voting message if no majority vote or tie within 5 minutes
+				User admin = event.getJDA().retrieveUserById(event.getUser().getId()).complete();
+				sendAdminVoting(admin, matchId, matchResults.get(matchId));
+			}
+		}, 1, TimeUnit.MINUTES);
 	}
 
 }
