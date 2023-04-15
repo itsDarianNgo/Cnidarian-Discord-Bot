@@ -69,12 +69,21 @@ public class ButtonClickListener extends ListenerAdapter {
 		}
 
 		String matchId = componentId.substring("end_match_".length());
+		if (matchResults.containsKey(matchId)) {
+			// Display an error message and return if the match has already ended.
+			event.reply("This match has already ended. Please wait for the results.").setEphemeral(true).queue();
+			return;
+		}
+
 		List<UserDTO> usersReacted = matchService.getUsersReactedForMatch(Long.parseLong(matchId));
 
 		for (UserDTO userDTO : usersReacted) {
 			User user = event.getJDA().retrieveUserById(userDTO.getDiscordId()).complete();
 			sendVotingDM(user, matchId);
 		}
+
+		// Disable the "End Match" button
+		disableButton(event.getMessage(), "end_match_" + matchId);
 	}
 
 	private void handleApproveButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
@@ -247,13 +256,16 @@ public class ButtonClickListener extends ListenerAdapter {
 	private void disableButton(Message message, String buttonIdToDisable) {
 		List<Component> updatedComponents = new ArrayList<>();
 
-		for (Component component : message.getActionRows().get(0).getComponents()) {
-			if (component.getId().equals(buttonIdToDisable)) {
-				Button button = (Button) component;
-				updatedComponents
-						.add(Button.of(button.getStyle(), button.getId(), button.getLabel()).withDisabled(true));
-			} else {
-				updatedComponents.add(component);
+		for (ActionRow actionRow : message.getActionRows()) {
+			for (Component component : actionRow.getComponents()) {
+
+				if (component.getId().equals(buttonIdToDisable)) {
+					Button button = (Button) component;
+					updatedComponents
+							.add(Button.of(button.getStyle(), button.getId(), button.getLabel()).withDisabled(true));
+				} else {
+					updatedComponents.add(component);
+				}
 			}
 		}
 
