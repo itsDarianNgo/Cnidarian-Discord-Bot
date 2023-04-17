@@ -22,6 +22,8 @@ import com.darianngo.discordBot.dtos.TeamDTO;
 import com.darianngo.discordBot.dtos.UserDTO;
 import com.darianngo.discordBot.dtos.UserVoteDTO;
 import com.darianngo.discordBot.embeds.FinalResultEmbed;
+import com.darianngo.discordBot.mappers.UserMapper;
+import com.darianngo.discordBot.repositories.UserRepository;
 import com.darianngo.discordBot.services.EloService;
 import com.darianngo.discordBot.services.MatchResultService;
 import com.darianngo.discordBot.services.MatchService;
@@ -47,6 +49,8 @@ public class ButtonClickListener extends ListenerAdapter {
 	private final UserService userService;
 	private final EloService eloService;
 	private final MatchResultService matchResultService;
+	private final UserMapper userMapper;
+	private final UserRepository userRepository;
 	private Map<String, UserVoteDTO> userVotes = new ConcurrentHashMap<>();
 	private final Map<String, MatchResultDTO> matchResults = new HashMap<>();
 	private final Map<String, AtomicInteger> usersFullyVoted = new ConcurrentHashMap<>();
@@ -54,12 +58,15 @@ public class ButtonClickListener extends ListenerAdapter {
 	private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 
 	public ButtonClickListener(MatchService matchService, VotingService votingService, UserService userService,
-			EloService eloService, MatchResultService matchResultService) {
+			EloService eloService, MatchResultService matchResultService, UserMapper userMapper,
+			UserRepository userRepository) {
 		this.matchService = matchService;
 		this.votingService = votingService;
 		this.userService = userService;
 		this.eloService = eloService;
 		this.matchResultService = matchResultService;
+		this.userMapper = userMapper;
+		this.userRepository = userRepository;
 	}
 
 	@Autowired
@@ -121,8 +128,10 @@ public class ButtonClickListener extends ListenerAdapter {
 		matchResult.setMatchId(Long.parseLong(matchId));
 		matchResult.setWinningTeamNumber(userVote.getTeamVote());
 		matchResult.setLosingTeamNumber(matchResult.getWinningTeamNumber() == 1L ? 2L : 1L);
-		matchResult.setWinningTeamId(matchResultService.getWinningTeamId(Long.parseLong(matchId), matchResult.getWinningTeamNumber()));
-		matchResult.setLosingTeamId(matchResultService.getLosingTeamId(Long.parseLong(matchId), matchResult.getWinningTeamNumber()));
+		matchResult.setWinningTeamId(
+				matchResultService.getWinningTeamId(Long.parseLong(matchId), matchResult.getWinningTeamNumber()));
+		matchResult.setLosingTeamId(
+				matchResultService.getLosingTeamId(Long.parseLong(matchId), matchResult.getWinningTeamNumber()));
 		matchResult.setWinningScore(userVote.getWinningScore());
 		matchResult.setLosingScore(userVote.getLosingScore());
 
@@ -149,19 +158,30 @@ public class ButtonClickListener extends ListenerAdapter {
 		}).collect(Collectors.toList());
 		match.setTeams(teams);
 
-		// Get the UserDTOs for all users in the match\
-		System.out.println("matchDTO: " + match);
+		// Get the UserDTOs for all users in the match
 		List<UserDTO> users = getUsersInMatch(match);
-		System.out.println("users: " + users);
-		System.out.println("matchResultDTO: " + matchResult);
 		// Update ELO ratings using the eloService
 		eloService.updateElo(matchResult, users);
 
-		// Display the final results in current channel
-		event.getChannel().sendMessageEmbeds(FinalResultEmbed.createEmbed(matchResult)).queue();
+		// Fetch updated UserEntities from the database and convert them to UserDTOs
+		List<UserDTO> updatedUsers = users.stream().map(user -> userRepository.findById(user.getDiscordId())
+				.map(userEntity -> userMapper.toDto(userEntity)).orElse(null)).collect(Collectors.toList());
+
+		// Replace existing UserDTOs in the TeamDTO objects with the updated ones
+		for (TeamDTO team : match.getTeams()) {
+			List<UserDTO> updatedTeamMembers = team.getMembers().stream()
+					.map(user -> updatedUsers.stream()
+							.filter(updatedUser -> updatedUser.getDiscordId().equals(user.getDiscordId())).findFirst()
+							.orElse(user))
+					.collect(Collectors.toList());
+			team.setMembers(updatedTeamMembers);
+		}
+
+		// Display the final results in the current channel
+		event.getChannel().sendMessageEmbeds(FinalResultEmbed.createEmbed(matchResult, match)).queue();
 
 		// Display the final results in match channel
-		matchService.sendMatchResultToDesignatedChannel(matchResult);
+		matchService.sendMatchResultToDesignatedChannel(matchResult, match);
 
 		// Delete the message
 		event.getMessage().delete().queue();
@@ -222,8 +242,10 @@ public class ButtonClickListener extends ListenerAdapter {
 			matchResult.setMatchId(Long.parseLong(matchId));
 			matchResult.setWinningTeamNumber(userVote.getTeamVote());
 			matchResult.setLosingTeamNumber(matchResult.getWinningTeamNumber() == 1L ? 2L : 1L);
-			matchResult.setWinningTeamId(matchResultService.getWinningTeamId(Long.parseLong(matchId), matchResult.getWinningTeamNumber()));
-			matchResult.setLosingTeamId(matchResultService.getLosingTeamId(Long.parseLong(matchId), matchResult.getWinningTeamNumber()));
+			matchResult.setWinningTeamId(
+					matchResultService.getWinningTeamId(Long.parseLong(matchId), matchResult.getWinningTeamNumber()));
+			matchResult.setLosingTeamId(
+					matchResultService.getLosingTeamId(Long.parseLong(matchId), matchResult.getWinningTeamNumber()));
 			matchResult.setWinningScore(userVote.getWinningScore());
 			matchResult.setLosingScore(userVote.getLosingScore());
 
@@ -239,17 +261,15 @@ public class ButtonClickListener extends ListenerAdapter {
 
 			// Get the UserDTOs for all users in the match
 			List<UserDTO> users = getUsersInMatch(match);
-			System.out.println("admin vote:" + users);
-			System.out.println("admin vote:" + matchResult);
 			// Update ELO ratings using the eloService
 			eloService.updateElo(matchResult, users);
 
 			// Save the results to the database
 			matchService.saveMatchResult(matchResult);
 			// Display the final results in current channel
-			event.getChannel().sendMessageEmbeds(FinalResultEmbed.createEmbed(matchResult)).queue();
+			event.getChannel().sendMessageEmbeds(FinalResultEmbed.createEmbed(matchResult, match)).queue();
 			// Display the final results in match channel
-			matchService.sendMatchResultToDesignatedChannel(matchResult);
+			matchService.sendMatchResultToDesignatedChannel(matchResult, match);
 
 			// Remove the vote from adminUserVotes after processing
 			adminUserVotes.remove(userVoteKey);

@@ -225,14 +225,14 @@ public class MatchServiceImpl implements MatchService {
 	}
 
 	@Override
-	public void sendMatchResultToDesignatedChannel(MatchResultDTO matchResult) {
+	public void sendMatchResultToDesignatedChannel(MatchResultDTO matchResult, MatchDTO match) {
 		MessageChannel designatedChannel = jda.getTextChannelById(discordChannelConfig.getMatchChannelId());
 		if (designatedChannel == null) {
 			System.out.println("Error: Designated channel not found.");
 			return;
 		}
 
-		designatedChannel.sendMessageEmbeds(FinalResultEmbed.createEmbed(matchResult)).queue();
+		designatedChannel.sendMessageEmbeds(FinalResultEmbed.createEmbed(matchResult, match)).queue();
 	}
 
 }

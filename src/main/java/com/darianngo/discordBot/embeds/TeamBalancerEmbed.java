@@ -23,13 +23,13 @@ public class TeamBalancerEmbed {
 
 		StringBuilder team1Builder = new StringBuilder();
 		for (UserDTO userDTO : team1) {
-			team1Builder.append("<@").append(userDTO.getDiscordId()).append("> (").append(userDTO.getRanking())
+			team1Builder.append("<@").append(userDTO.getDiscordId()).append("> (").append(userDTO.getElo())
 					.append(")\n");
 		}
 
 		StringBuilder team2Builder = new StringBuilder();
 		for (UserDTO userDTO : team2) {
-			team2Builder.append("<@").append(userDTO.getDiscordId()).append("> (").append(userDTO.getRanking())
+			team2Builder.append("<@").append(userDTO.getDiscordId()).append("> (").append(userDTO.getElo())
 					.append(")\n");
 		}
 
