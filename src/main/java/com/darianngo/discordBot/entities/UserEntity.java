@@ -2,6 +2,7 @@ package com.darianngo.discordBot.entities;
 
 import java.util.List;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
@@ -24,8 +25,9 @@ public class UserEntity {
 	private String mainRole;
 	private String secondaryRole;
 	private String region;
-	private Integer elo;
-	private Integer recentEloChange;
+	private Double elo;
+	private Double recentEloChange;
+	private Double sigma;
 	private Integer totalMatches;
 	private Integer wins;
 	private Integer losses;

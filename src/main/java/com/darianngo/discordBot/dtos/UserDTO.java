@@ -17,8 +17,9 @@ public class UserDTO {
 	private String mainRole;
 	private String secondaryRole;
 	private String region;
-	private Integer elo;
-	private Integer recentEloChange;
+	private Double elo;
+	private Double recentEloChange;
+	private Double sigma;
 	private Integer totalMatches;
 	private Integer wins;
 	private Integer losses;
