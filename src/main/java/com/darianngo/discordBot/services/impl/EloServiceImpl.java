@@ -112,6 +112,7 @@ public class EloServiceImpl implements EloService {
 	private void updateEloForUser(UserDTO user, double eloChange) {
 		int roundedEloChange = (int) Math.ceil(eloChange);
 		user.setElo(user.getElo() + roundedEloChange);
+		user.setRecentEloChange((double) roundedEloChange);
 		UserEntity userEntity = userMapper.toEntity(user);
 		userRepository.save(userEntity);
 	}

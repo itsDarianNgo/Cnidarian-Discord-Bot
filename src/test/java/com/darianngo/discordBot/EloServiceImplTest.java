@@ -1,6 +1,4 @@
-package com.darianngo.discordBot.services.impl;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
+package com.darianngo.discordBot;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,6 +17,7 @@ import com.darianngo.discordBot.dtos.UserTeamDTO;
 import com.darianngo.discordBot.mappers.UserMapper;
 import com.darianngo.discordBot.repositories.UserRepository;
 import com.darianngo.discordBot.services.EloService;
+import com.darianngo.discordBot.services.impl.EloServiceImpl;
 
 @ExtendWith(MockitoExtension.class)
 public class EloServiceImplTest {
@@ -64,26 +63,27 @@ public class EloServiceImplTest {
 		List<UserDTO> usersInMatch = Arrays.asList(user1, user2, user3, user4, user5, user6, user7, user8, user9,
 				user10);
 		eloService.updateElo(matchResult, usersInMatch);
-		
-	    printTeamInfo(matchResult, usersInMatch);
+
+		printTeamInfo(matchResult, usersInMatch);
 	}
 
 	private void printTeamInfo(MatchResultDTO matchResult, List<UserDTO> usersInMatch) {
-	    System.out.println("Winning Team (Team ID: " + matchResult.getWinningTeamId() + "):");
-	    printTeam(matchResult.getWinningTeamId(), usersInMatch);
-	    System.out.println("\nLosing Team (Team ID: " + matchResult.getLosingTeamId() + "):");
-	    printTeam(matchResult.getLosingTeamId(), usersInMatch);
+		System.out.println("Winning Team (Team ID: " + matchResult.getWinningTeamId() + "):");
+		printTeam(matchResult.getWinningTeamId(), usersInMatch);
+		System.out.println("\nLosing Team (Team ID: " + matchResult.getLosingTeamId() + "):");
+		printTeam(matchResult.getLosingTeamId(), usersInMatch);
 	}
 
 	private void printTeam(Long teamId, List<UserDTO> usersInMatch) {
-	    for (UserDTO user : usersInMatch) {
-	        for (UserTeamDTO userTeam : user.getUserTeams()) {
-	            if (userTeam.getTeamId().equals(teamId)) {
-	                double oldElo = user.getElo() - user.getRecentEloChange();
-	                System.out.printf("User: %s, Elo: %.2f (%+.2f) = %.2f%n", user.getSummonerName(), oldElo, user.getRecentEloChange(), user.getElo());
-	            }
-	        }
-	    }
+		for (UserDTO user : usersInMatch) {
+			for (UserTeamDTO userTeam : user.getUserTeams()) {
+				if (userTeam.getTeamId().equals(teamId)) {
+					double oldElo = user.getElo() - user.getRecentEloChange();
+					System.out.printf("User: %s, Elo: %.2f (%+.2f) = %.2f%n", user.getSummonerName(), oldElo,
+							user.getRecentEloChange(), user.getElo());
+				}
+			}
+		}
 	}
 
 	private UserDTO createUser(String discordId, String summonerName, double elo, double sigma, List<Long> teamIds) {
