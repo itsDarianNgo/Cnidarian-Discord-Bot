@@ -50,15 +50,15 @@ public class EloServiceImplTest {
 		List<Long> user10TeamIds = Arrays.asList(2L, 4L, 6L, 8L, 10L);
 
 		UserDTO user1 = createUser("1", "User1", 1200.0, 400.0, user1TeamIds);
-		UserDTO user2 = createUser("2", "User2", 1250.0, 380.0, user2TeamIds);
-		UserDTO user3 = createUser("3", "User3", 1100.0, 370.0, user3TeamIds);
-		UserDTO user4 = createUser("4", "User4", 1150.0, 390.0, user4TeamIds);
-		UserDTO user5 = createUser("5", "User5", 1300.0, 420.0, user5TeamIds);
+		UserDTO user2 = createUser("2", "User2", 1250.0, 400.0, user2TeamIds);
+		UserDTO user3 = createUser("3", "User3", 1100.0, 400.0, user3TeamIds);
+		UserDTO user4 = createUser("4", "User4", 1150.0, 400.0, user4TeamIds);
+		UserDTO user5 = createUser("5", "User5", 1300.0, 400.0, user5TeamIds);
 		UserDTO user6 = createUser("6", "User6", 1350.0, 400.0, user6TeamIds);
-		UserDTO user7 = createUser("7", "User7", 1400.0, 430.0, user7TeamIds);
-		UserDTO user8 = createUser("8", "User8", 1450.0, 410.0, user8TeamIds);
-		UserDTO user9 = createUser("9", "User9", 1500.0, 440.0, user9TeamIds);
-		UserDTO user10 = createUser("10", "User10", 1550.0, 420.0, user10TeamIds);
+		UserDTO user7 = createUser("7", "User7", 1400.0, 400.0, user7TeamIds);
+		UserDTO user8 = createUser("8", "User8", 1450.0, 400.0, user8TeamIds);
+		UserDTO user9 = createUser("9", "User9", 1500.0, 400.0, user9TeamIds);
+		UserDTO user10 = createUser("10", "User10", 1550.0, 400.0, user10TeamIds);
 
 		List<UserDTO> usersInMatch = Arrays.asList(user1, user2, user3, user4, user5, user6, user7, user8, user9,
 				user10);
@@ -79,7 +79,7 @@ public class EloServiceImplTest {
 			for (UserTeamDTO userTeam : user.getUserTeams()) {
 				if (userTeam.getTeamId().equals(teamId)) {
 					double oldElo = user.getElo() - user.getRecentEloChange();
-					System.out.printf("User: %s, Elo: %.2f (%+.2f) = %.2f%n", user.getSummonerName(), oldElo,
+					System.out.printf("%s: Elo: %.2f (%+.2f) = %.2f%n", user.getSummonerName(), oldElo,
 							user.getRecentEloChange(), user.getElo());
 				}
 			}

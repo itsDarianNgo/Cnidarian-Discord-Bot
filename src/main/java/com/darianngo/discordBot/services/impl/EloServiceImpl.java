@@ -19,7 +19,7 @@ import com.darianngo.discordBot.services.EloService;
 
 @Service
 public class EloServiceImpl implements EloService {
-	private static final double K_FACTOR = 32;
+	private static final double K_FACTOR = 100;
 	private static final double BETA = 200;
 	private static final Double INITIAL_ELO = Double.valueOf(1200);
 	private static final Double INITIAL_SIGMA = Double.valueOf(400);
@@ -37,15 +37,13 @@ public class EloServiceImpl implements EloService {
 		List<UserDTO> winningTeam = teams.get(matchResult.getWinningTeamId());
 		List<UserDTO> losingTeam = teams.get(matchResult.getLosingTeamId());
 
-		double winProbability = winProbability(winningTeam, losingTeam);
-
 		for (UserDTO winner : winningTeam) {
-			double eloChange = calculateEloChange(winner, winProbability, true, matchResult);
+			double eloChange = calculateEloChange(winner, true, matchResult, losingTeam);
 			updateEloForUser(winner, eloChange);
 		}
 
 		for (UserDTO loser : losingTeam) {
-			double eloChange = calculateEloChange(loser, winProbability, false, matchResult);
+			double eloChange = calculateEloChange(loser, false, matchResult, winningTeam);
 			updateEloForUser(loser, eloChange);
 		}
 	}
@@ -66,41 +64,43 @@ public class EloServiceImpl implements EloService {
 		return teams;
 	}
 
-	private double winProbability(List<UserDTO> team1, List<UserDTO> team2) {
-		SummaryStatistics team1Stats = calculateTeamStats(team1);
-		SummaryStatistics team2Stats = calculateTeamStats(team2);
-
-		double deltaMu = team1Stats.getSum() - team2Stats.getSum();
-		double sumSigma = team1Stats.getSumsq() + team2Stats.getSumsq();
-		int size = team1.size() + team2.size();
-		double denom = Math.sqrt(size * (BETA * BETA) + sumSigma);
+	private double winProbability(UserDTO user1, UserDTO user2) {
+		double deltaMu = user1.getElo() - user2.getElo();
+		double sumSigma = user1.getSigma() * user1.getSigma() + user2.getSigma() * user2.getSigma();
+		double denom = Math.sqrt(2 * (BETA * BETA) + sumSigma);
 
 		NormalDistribution normalDistribution = new NormalDistribution(0, 1);
 		return normalDistribution.cumulativeProbability(deltaMu / denom);
 	}
 
-	private SummaryStatistics calculateTeamStats(List<UserDTO> team) {
-		SummaryStatistics teamStats = new SummaryStatistics();
+//	private SummaryStatistics calculateTeamStats(List<UserDTO> team) {
+//		SummaryStatistics teamStats = new SummaryStatistics();
+//
+//		for (UserDTO user : team) {
+//			if (user.getElo() == null || Double.isNaN(user.getElo()) || user.getElo() == 0.0 || user.getSigma() == null
+//					|| Double.isNaN(user.getSigma()) || user.getSigma() == 0.0) {
+//				user.setElo(INITIAL_ELO);
+//				user.setSigma(INITIAL_SIGMA);
+//			}
+//			teamStats.addValue(user.getElo());
+//			teamStats.addValue(user.getSigma() * user.getSigma());
+//		}
+//		return teamStats;
+//	}
 
-		for (UserDTO user : team) {
-			if (user.getElo() == null || Double.isNaN(user.getElo()) || user.getElo() == 0.0 || user.getSigma() == null
-					|| Double.isNaN(user.getSigma()) || user.getSigma() == 0.0) {
-				user.setElo(INITIAL_ELO);
-				user.setSigma(INITIAL_SIGMA);
-			}
-			teamStats.addValue(user.getElo());
-			teamStats.addValue(user.getSigma() * user.getSigma());
-		}
-		return teamStats;
-	}
-
-	private double calculateEloChange(UserDTO user, double winProbability, boolean isWinner,
-			MatchResultDTO matchResult) {
+	private double calculateEloChange(UserDTO user, boolean isWinner, MatchResultDTO matchResult,
+			List<UserDTO> opposingTeam) {
 		double actualOutcome = isWinner ? 1 : 0;
 		double matchWeight = calculateMatchWeight(matchResult.getWinningScore(), matchResult.getLosingScore());
-		double eloChange = K_FACTOR * matchWeight * (actualOutcome - winProbability);
 
-		return eloChange;
+		double totalEloChange = 0;
+		for (UserDTO opponent : opposingTeam) {
+			double winProb = winProbability(user, opponent);
+			double eloChange = K_FACTOR * matchWeight * (actualOutcome - winProb);
+			totalEloChange += eloChange;
+		}
+
+		return totalEloChange / opposingTeam.size();
 	}
 
 	private double calculateMatchWeight(int winningScore, int losingScore) {
