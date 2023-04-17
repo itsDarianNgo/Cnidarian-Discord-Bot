@@ -30,7 +30,5 @@ public class MatchEntity {
 
 	@OneToMany(mappedBy = "match", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
 	private List<TeamEntity> teams;
-	private String winningTeam;
-	private String finalScore;
 
 }

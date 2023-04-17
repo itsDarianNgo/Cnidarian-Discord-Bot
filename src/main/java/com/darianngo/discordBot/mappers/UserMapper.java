@@ -9,15 +9,17 @@ import com.darianngo.discordBot.entities.UserEntity;
 
 import net.dv8tion.jda.api.entities.User;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", uses = { UserTeamMapper.class })
 public interface UserMapper {
-    UserMapper INSTANCE = Mappers.getMapper(UserMapper.class);
+	UserMapper INSTANCE = Mappers.getMapper(UserMapper.class);
 
-    UserDTO toDto(UserEntity userEntity);
+	@Mapping(source = "userTeams", target = "userTeams")
+	UserDTO toDto(UserEntity entity);
 
-    UserEntity toEntity(UserDTO userDTO);
+	@Mapping(source = "userTeams", target = "userTeams")
+	UserEntity toEntity(UserDTO dto);
 
-    @Mapping(source = "id", target = "discordId")
-    @Mapping(source = "name", target = "discordName")
-    UserDTO jdaUserToDto(User jdaUser);
+	@Mapping(source = "id", target = "discordId")
+	@Mapping(source = "name", target = "discordName")
+	UserDTO jdaUserToDto(User jdaUser);
 }

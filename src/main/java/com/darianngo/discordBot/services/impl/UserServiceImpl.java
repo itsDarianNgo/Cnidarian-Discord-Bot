@@ -27,7 +27,7 @@ public class UserServiceImpl implements UserService {
 
 	@Override
 	public UserDTO getUserById(String id) {
-		UserEntity userEntity = userRepository.findById(id).orElse(null);
+		UserEntity userEntity = userRepository.findByIdWithUserTeams(id).orElse(null);
 		return userEntity != null ? userMapper.toDto(userEntity) : null;
 	}
 
@@ -36,7 +36,8 @@ public class UserServiceImpl implements UserService {
 		UserEntity userEntity = userRepository.findById(discordId).orElse(null);
 
 		if (userEntity == null) {
-			UserDTO newUserDTO = new UserDTO(discordId, discordName, null, ranking, null, null, null, null, null, null);
+			UserDTO newUserDTO = new UserDTO(discordId, discordName, null, ranking, null, null, null, null, null, null,
+					null, null, null);
 			UserEntity newUser = userRepository.save(userMapper.toEntity(newUserDTO));
 			return userMapper.toDto(newUser);
 		} else {
@@ -53,7 +54,7 @@ public class UserServiceImpl implements UserService {
 
 		if (userEntity == null) {
 			UserDTO newUserDTO = new UserDTO(discordId, discordName, mainRole, null, secondaryRole, null, null, null,
-					null, null);
+					null, null, null, null, null);
 			UserEntity newUser = userRepository.save(userMapper.toEntity(newUserDTO));
 			return userMapper.toDto(newUser);
 		} else {

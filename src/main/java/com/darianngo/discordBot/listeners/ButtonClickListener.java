@@ -10,17 +10,25 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.crossstore.ChangeSetPersister.NotFoundException;
 
 import com.darianngo.discordBot.config.DiscordChannelConfig;
+import com.darianngo.discordBot.dtos.MatchDTO;
 import com.darianngo.discordBot.dtos.MatchResultDTO;
+import com.darianngo.discordBot.dtos.TeamDTO;
 import com.darianngo.discordBot.dtos.UserDTO;
 import com.darianngo.discordBot.dtos.UserVoteDTO;
 import com.darianngo.discordBot.embeds.FinalResultEmbed;
+import com.darianngo.discordBot.services.EloService;
+import com.darianngo.discordBot.services.MatchResultService;
 import com.darianngo.discordBot.services.MatchService;
+import com.darianngo.discordBot.services.UserService;
 import com.darianngo.discordBot.services.VotingService;
 
+import jakarta.persistence.EntityNotFoundException;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageChannel;
@@ -36,15 +44,22 @@ import net.dv8tion.jda.api.interactions.components.Component;
 public class ButtonClickListener extends ListenerAdapter {
 	private final MatchService matchService;
 	private final VotingService votingService;
+	private final UserService userService;
+	private final EloService eloService;
+	private final MatchResultService matchResultService;
 	private Map<String, UserVoteDTO> userVotes = new ConcurrentHashMap<>();
 	private final Map<String, MatchResultDTO> matchResults = new HashMap<>();
 	private final Map<String, AtomicInteger> usersFullyVoted = new ConcurrentHashMap<>();
 	private Map<String, UserVoteDTO> adminUserVotes = new ConcurrentHashMap<>();
 	private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 
-	public ButtonClickListener(MatchService matchService, VotingService votingService) {
+	public ButtonClickListener(MatchService matchService, VotingService votingService, UserService userService,
+			EloService eloService, MatchResultService matchResultService) {
 		this.matchService = matchService;
 		this.votingService = votingService;
+		this.userService = userService;
+		this.eloService = eloService;
+		this.matchResultService = matchResultService;
 	}
 
 	@Autowired
@@ -98,19 +113,72 @@ public class ButtonClickListener extends ListenerAdapter {
 	private void handleApproveButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
 		String matchId = buttonIdParts[1];
 		UserVoteDTO userVote = userVotes.get(event.getUser().getId() + "_" + matchId);
+		MatchDTO match = new MatchDTO();
 		MatchResultDTO matchResult = new MatchResultDTO();
+
+		match.setId(Long.parseLong(matchId));
+		matchResult.setMatch(match);
 		matchResult.setMatchId(Long.parseLong(matchId));
-		matchResult.setWinningTeamId(userVote.getTeamVote());
+		matchResult.setWinningTeamNumber(userVote.getTeamVote());
+		matchResult.setLosingTeamNumber(matchResult.getWinningTeamNumber() == 1L ? 2L : 1L);
+		matchResult.setWinningTeamId(matchResultService.getWinningTeamId(Long.parseLong(matchId), matchResult.getWinningTeamNumber()));
+		matchResult.setLosingTeamId(matchResultService.getLosingTeamId(Long.parseLong(matchId), matchResult.getWinningTeamNumber()));
 		matchResult.setWinningScore(userVote.getWinningScore());
 		matchResult.setLosingScore(userVote.getLosingScore());
+
 		// Save the results to the database
 		matchService.saveMatchResult(matchResult);
+
+		// Get the match using the matchId
+		try {
+			match = matchService.getMatchById(Long.parseLong(matchId));
+		} catch (EntityNotFoundException | NumberFormatException | NotFoundException e) {
+			// Handle the exception (e.g., log the error, send a message to the user, etc.)
+			event.getChannel().sendMessage("Match not found with ID: " + matchId).queue();
+			return;
+		}
+
+		// Get the teams associated with the match
+		Map<Long, List<UserDTO>> teamsWithMatchId = matchService.getTeamsWithMatchId(Long.parseLong(matchId));
+		List<TeamDTO> teams = teamsWithMatchId.entrySet().stream().map(entry -> {
+			TeamDTO teamDTO = new TeamDTO();
+			teamDTO.setId(entry.getKey());
+			teamDTO.setMatchId(Long.parseLong(matchId));
+			teamDTO.setMembers(entry.getValue());
+			return teamDTO;
+		}).collect(Collectors.toList());
+		match.setTeams(teams);
+
+		// Get the UserDTOs for all users in the match\
+		System.out.println("matchDTO: " + match);
+		List<UserDTO> users = getUsersInMatch(match);
+		System.out.println("users: " + users);
+		System.out.println("matchResultDTO: " + matchResult);
+		// Update ELO ratings using the eloService
+		eloService.updateElo(matchResult, users);
+
 		// Display the final results in current channel
 		event.getChannel().sendMessageEmbeds(FinalResultEmbed.createEmbed(matchResult)).queue();
+
 		// Display the final results in match channel
 		matchService.sendMatchResultToDesignatedChannel(matchResult);
+
 		// Delete the message
 		event.getMessage().delete().queue();
+	}
+
+	private List<UserDTO> getUsersInMatch(MatchDTO match) {
+		List<UserDTO> users = new ArrayList<>();
+		for (TeamDTO team : match.getTeams()) {
+			for (UserDTO user : team.getMembers()) {
+				String userId = user.getDiscordId();
+				UserDTO fetchedUser = userService.getUserById(userId);
+				if (fetchedUser != null) {
+					users.add(fetchedUser);
+				}
+			}
+		}
+		return users;
 	}
 
 	private void handleRejectButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
@@ -152,11 +220,32 @@ public class ButtonClickListener extends ListenerAdapter {
 			// Update matchResult
 			MatchResultDTO matchResult = new MatchResultDTO();
 			matchResult.setMatchId(Long.parseLong(matchId));
-			matchResult.setWinningTeamId(userVote.getTeamVote());
+			matchResult.setWinningTeamNumber(userVote.getTeamVote());
+			matchResult.setLosingTeamNumber(matchResult.getWinningTeamNumber() == 1L ? 2L : 1L);
+			matchResult.setWinningTeamId(matchResultService.getWinningTeamId(Long.parseLong(matchId), matchResult.getWinningTeamNumber()));
+			matchResult.setLosingTeamId(matchResultService.getLosingTeamId(Long.parseLong(matchId), matchResult.getWinningTeamNumber()));
 			matchResult.setWinningScore(userVote.getWinningScore());
 			matchResult.setLosingScore(userVote.getLosingScore());
 
-			matchService.saveMatchResult(matchResult); // Save the results to the database
+			// Get the match using the matchId
+			MatchDTO match = null;
+			try {
+				match = matchService.getMatchById(Long.parseLong(matchId));
+			} catch (EntityNotFoundException | NumberFormatException | NotFoundException e) {
+				// Handle the exception (e.g., log the error, send a message to the user, etc.)
+				event.getChannel().sendMessage("Match not found with ID: " + matchId).queue();
+				return;
+			}
+
+			// Get the UserDTOs for all users in the match
+			List<UserDTO> users = getUsersInMatch(match);
+			System.out.println("admin vote:" + users);
+			System.out.println("admin vote:" + matchResult);
+			// Update ELO ratings using the eloService
+			eloService.updateElo(matchResult, users);
+
+			// Save the results to the database
+			matchService.saveMatchResult(matchResult);
 			// Display the final results in current channel
 			event.getChannel().sendMessageEmbeds(FinalResultEmbed.createEmbed(matchResult)).queue();
 			// Display the final results in match channel
@@ -218,7 +307,7 @@ public class ButtonClickListener extends ListenerAdapter {
 				// Update matchResult
 				MatchResultDTO matchResult = new MatchResultDTO();
 				matchResult.setMatchId(Long.parseLong(matchId));
-				matchResult.setWinningTeamId(winningTeam);
+				matchResult.setWinningTeamNumber(winningTeam);
 				matchResult.setWinningScore(Integer.parseInt(winningScore.split("-")[0]));
 				matchResult.setLosingScore(Integer.parseInt(winningScore.split("-")[1]));
 
@@ -239,7 +328,7 @@ public class ButtonClickListener extends ListenerAdapter {
 		embedBuilder.setTitle("Match Result Approval");
 		embedBuilder.setDescription("Please approve or reject the match result for match ID: " + matchId);
 		embedBuilder.setColor(Color.YELLOW);
-		embedBuilder.addField("Winning Team", "Team " + matchResult.getWinningTeamId(), true);
+		embedBuilder.addField("Winning Team", "Team " + matchResult.getWinningTeamNumber(), true);
 		embedBuilder.addField("Score", matchResult.getWinningScore() + "-" + matchResult.getLosingScore(), true);
 		MessageEmbed embed = embedBuilder.build();
 		ActionRow actionRow = ActionRow.of(Button.success("approve_" + matchId, "✅"),

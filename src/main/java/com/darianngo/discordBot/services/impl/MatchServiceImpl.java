@@ -30,6 +30,7 @@ import com.darianngo.discordBot.repositories.MatchResultRepository;
 import com.darianngo.discordBot.repositories.TeamRepository;
 import com.darianngo.discordBot.repositories.UserRepository;
 import com.darianngo.discordBot.repositories.UserTeamRepository;
+import com.darianngo.discordBot.services.EloService;
 import com.darianngo.discordBot.services.MatchService;
 
 import jakarta.persistence.EntityGraph;
@@ -64,6 +65,8 @@ public class MatchServiceImpl implements MatchService {
 	private EntityManager entityManager;
 	@Autowired
 	private DiscordChannelConfig discordChannelConfig;
+	@Autowired
+	private EloService eloService;
 
 	public MatchServiceImpl(MatchRepository matchRepository, MatchMapper matchMapper, UserRepository userRepository,
 			MatchResultRepository matchResultRepository, MatchResultMapper matchResultMapper, UserMapper userMapper) {
@@ -114,6 +117,30 @@ public class MatchServiceImpl implements MatchService {
 		}
 
 	}
+	@Transactional
+	@Override
+	public Map<Long, List<UserDTO>> getTeamsWithMatchId(Long matchId) {
+		// Find the match by its ID
+		MatchEntity matchEntity = matchRepository.findById(matchId)
+				.orElseThrow(() -> new IllegalArgumentException("Match not found with id: " + matchId));
+
+		// Find the teams associated with the match
+		List<TeamEntity> teams = teamRepository.findByMatch(matchEntity);
+
+		// Prepare a map to store the result
+		Map<Long, List<UserDTO>> resultMap = new HashMap<>();
+
+		// Iterate through the teams and find their associated users
+		for (TeamEntity team : teams) {
+			List<UserTeamEntity> userTeams = userTeamRepository.findByTeam(team);
+			List<UserDTO> usersInTeam = userTeams.stream().map(userTeam -> userMapper.toDto(userTeam.getUser()))
+					.collect(Collectors.toList());
+
+			resultMap.put(team.getId(), usersInTeam);
+		}
+
+		return resultMap;
+	}
 
 	@Override
 	public void updateMatch(MatchDTO matchDTO) {
@@ -124,9 +151,8 @@ public class MatchServiceImpl implements MatchService {
 	@Transactional
 	@Override
 	public MatchDTO getMatchById(Long matchId) {
-		MatchEntity matchEntity;
-		matchEntity = matchRepository.findById(matchId)
-				.orElseThrow(() -> new EntityNotFoundException("Match not found with ID: " + matchId));
+		MatchEntity matchEntity = matchRepository.findById(matchId)
+				.orElseThrow(() -> new RuntimeException("Match not found with ID: " + matchId));
 		return matchMapper.toDto(matchEntity);
 	}
 
@@ -139,12 +165,13 @@ public class MatchServiceImpl implements MatchService {
 
 	@Override
 	public List<UserDTO> getUsersInMatch(Long matchId) {
-		List<UserTeamEntity> userTeamEntities = userTeamRepository.findByTeamMatchId(matchId);
-		List<UserDTO> users = userTeamEntities.stream().map(UserTeamEntity::getUser).map(userMapper::toDto)
+		List<UserTeamEntity> userTeamEntities = userTeamRepository.findByTeamMatchIdWithUser(matchId);
+		List<UserDTO> users = userTeamEntities.stream().map(ute -> userMapper.toDto(ute.getUser()))
 				.collect(Collectors.toList());
 		return users;
 	}
 
+	@Transactional
 	@Override
 	public List<UserDTO> getUsersReactedForMatch(Long matchId) {
 		EntityGraph<?> entityGraph = entityManager.createEntityGraph("MatchEntity.teamsAndUsers");

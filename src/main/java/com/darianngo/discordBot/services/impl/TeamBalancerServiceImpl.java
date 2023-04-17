@@ -80,7 +80,6 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 		int eloDifference = Math.abs(calculateTeamScore(team1) - calculateTeamScore(team2));
 		// Save teams to the database
 		matchService.saveTeamsWithMatchId(team1, team2, matchId);
-
 		return TeamBalancerEmbed.createEmbed(team1, team2, eloDifference, matchId);
 	}
 

@@ -32,4 +32,6 @@ public interface MatchService {
 
 	void sendMatchResultToDesignatedChannel(MatchResultDTO matchResult);
 
+	Map<Long, List<UserDTO>> getTeamsWithMatchId(Long matchId);
+
 }

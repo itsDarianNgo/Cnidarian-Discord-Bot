@@ -10,7 +10,11 @@ import lombok.NoArgsConstructor;
 public class MatchResultDTO {
 	private Long id;
 	private Long matchId;
-	private Long winningTeamId;
+	private Long WinningTeamId;
+	private Long LosingTeamId;
+	private Long winningTeamNumber;
+	private Long losingTeamNumber;
 	private Integer winningScore;
 	private Integer losingScore;
+	private MatchDTO match;
 }
