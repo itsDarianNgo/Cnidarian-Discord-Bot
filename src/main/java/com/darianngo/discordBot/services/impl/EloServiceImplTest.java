@@ -50,7 +50,7 @@ public class EloServiceImplTest {
 		List<Long> user10TeamIds = Arrays.asList(2L, 4L, 6L, 8L, 10L);
 
 		UserDTO user1 = createUser("1", "User1", 1200.0, 800.0, user1TeamIds);
-		UserDTO user2 = createUser("2", "User2", 1250.0, 800.0, user2TeamIds);
+		UserDTO user2 = createUser("2", "User2", 1250.0, 300.0, user2TeamIds);
 		UserDTO user3 = createUser("3", "User3", 900.0, 800.0, user3TeamIds);
 		UserDTO user4 = createUser("4", "User4", 1150.0, 800.0, user4TeamIds);
 		UserDTO user5 = createUser("5", "User5", 1300.0, 800.0, user5TeamIds);

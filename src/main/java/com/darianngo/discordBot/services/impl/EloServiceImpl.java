@@ -18,11 +18,11 @@ import com.darianngo.discordBot.services.EloService;
 
 @Service
 public class EloServiceImpl implements EloService {
-	private static final double K_FACTOR = 200;
+	private static final double K_FACTOR = 350;
 	private static final double BETA = 200;
 	private static final Double INITIAL_ELO = Double.valueOf(1200);
 	private static final Double INITIAL_SIGMA = Double.valueOf(800);
-	private static final Double SIGMA_DECAY_RATE = 0.95;
+	private static final Double SIGMA_DECAY_RATE = 0.99;
 
 	private final UserRepository userRepository;
 	private final UserMapper userMapper;
@@ -108,6 +108,14 @@ public class EloServiceImpl implements EloService {
 		int roundedEloChange = (int) Math.ceil(eloChange);
 		user.setElo(user.getElo() + roundedEloChange);
 		user.setRecentEloChange((double) roundedEloChange);
+
+		// Update totalMatches, wins, and losses
+		user.setTotalMatches((user.getTotalMatches() == null ? 0 : user.getTotalMatches()) + 1);
+		if (isWinner) {
+			user.setWins((user.getWins() == null ? 0 : user.getWins()) + 1);
+		} else {
+			user.setLosses((user.getLosses() == null ? 0 : user.getLosses()) + 1);
+		}
 
 		// Update the sigma value
 		user.setSigma(calculateSigmaChange(user.getSigma()));
