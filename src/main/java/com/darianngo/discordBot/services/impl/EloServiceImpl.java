@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.math3.distribution.NormalDistribution;
-import org.apache.commons.math3.stat.descriptive.SummaryStatistics;
 import org.springframework.stereotype.Service;
 
 import com.darianngo.discordBot.dtos.MatchResultDTO;
@@ -19,10 +18,11 @@ import com.darianngo.discordBot.services.EloService;
 
 @Service
 public class EloServiceImpl implements EloService {
-	private static final double K_FACTOR = 100;
+	private static final double K_FACTOR = 200;
 	private static final double BETA = 200;
 	private static final Double INITIAL_ELO = Double.valueOf(1200);
 	private static final Double INITIAL_SIGMA = Double.valueOf(400);
+	private static final Double SIGMA_DECAY_RATE = 0.95;
 
 	private final UserRepository userRepository;
 	private final UserMapper userMapper;
@@ -38,17 +38,17 @@ public class EloServiceImpl implements EloService {
 		List<UserDTO> losingTeam = teams.get(matchResult.getLosingTeamId());
 
 		for (UserDTO winner : winningTeam) {
-			double eloChange = calculateEloChange(winner, true, matchResult, losingTeam);
-			updateEloForUser(winner, eloChange);
+			double eloChange = calculateEloChange(winner, true, matchResult, winningTeam, losingTeam);
+			updateEloForUser(winner, eloChange, true);
 		}
 
 		for (UserDTO loser : losingTeam) {
-			double eloChange = calculateEloChange(loser, false, matchResult, winningTeam);
-			updateEloForUser(loser, eloChange);
+			double eloChange = calculateEloChange(loser, false, matchResult, losingTeam, winningTeam);
+			updateEloForUser(loser, eloChange, false);
 		}
 	}
 
-	private Map<Long, List<UserDTO>> groupUsersByTeam(List<UserDTO> usersInMatch) {
+	public Map<Long, List<UserDTO>> groupUsersByTeam(List<UserDTO> usersInMatch) {
 		Map<Long, List<UserDTO>> teams = new HashMap<>();
 
 		for (UserDTO user : usersInMatch) {
@@ -64,56 +64,74 @@ public class EloServiceImpl implements EloService {
 		return teams;
 	}
 
-	private double winProbability(UserDTO user1, UserDTO user2) {
-		double deltaMu = user1.getElo() - user2.getElo();
-		double sumSigma = user1.getSigma() * user1.getSigma() + user2.getSigma() * user2.getSigma();
+	private double calculateEloChange(UserDTO user, boolean isWinner, MatchResultDTO matchResult,
+			List<UserDTO> userTeam, List<UserDTO> opposingTeam) {
+		double actualOutcome = isWinner ? 1 : 0;
+		double matchWeight = calculateMatchWeight(matchResult.getWinningScore(), matchResult.getLosingScore());
+
+		double winProb = winProbability(userTeam, opposingTeam);
+		double totalEloChange = K_FACTOR * matchWeight * (actualOutcome - winProb);
+
+		// Introduce scaling factor based on user's sigma
+		double sigmaScalingFactor = user.getSigma() / INITIAL_SIGMA;
+
+		// Introduce scaling factor based on average ELO of the other team and teammates
+		double avgEloOtherTeam = calculateAverageElo(opposingTeam);
+		double eloScalingExponent = 1.2; // You can adjust this value to change the scaling effect
+		double eloScalingFactor = 1.0;
+
+		if (isWinner) {
+			eloScalingFactor = Math.pow(avgEloOtherTeam / user.getElo(), eloScalingExponent);
+		} else {
+			eloScalingFactor = Math.pow(user.getElo() / avgEloOtherTeam, eloScalingExponent);
+		}
+
+		// Calculate final ELO change considering scaling factors and team size
+		return (totalEloChange * sigmaScalingFactor * eloScalingFactor) / userTeam.size();
+	}
+
+	public double winProbability(List<UserDTO> team1, List<UserDTO> team2) {
+		double team1Elo = calculateAverageElo(team1);
+		double team1Sigma = calculateAverageSigma(team1);
+		double team2Elo = calculateAverageElo(team2);
+		double team2Sigma = calculateAverageSigma(team2);
+
+		double deltaMu = team1Elo - team2Elo;
+		double sumSigma = team1Sigma * team1Sigma + team2Sigma * team2Sigma;
 		double denom = Math.sqrt(2 * (BETA * BETA) + sumSigma);
 
 		NormalDistribution normalDistribution = new NormalDistribution(0, 1);
 		return normalDistribution.cumulativeProbability(deltaMu / denom);
 	}
 
-//	private SummaryStatistics calculateTeamStats(List<UserDTO> team) {
-//		SummaryStatistics teamStats = new SummaryStatistics();
-//
-//		for (UserDTO user : team) {
-//			if (user.getElo() == null || Double.isNaN(user.getElo()) || user.getElo() == 0.0 || user.getSigma() == null
-//					|| Double.isNaN(user.getSigma()) || user.getSigma() == 0.0) {
-//				user.setElo(INITIAL_ELO);
-//				user.setSigma(INITIAL_SIGMA);
-//			}
-//			teamStats.addValue(user.getElo());
-//			teamStats.addValue(user.getSigma() * user.getSigma());
-//		}
-//		return teamStats;
-//	}
+	private void updateEloForUser(UserDTO user, double eloChange, boolean isWinner) {
+		int roundedEloChange = (int) Math.ceil(eloChange);
+		user.setElo(user.getElo() + roundedEloChange);
+		user.setRecentEloChange((double) roundedEloChange);
 
-	private double calculateEloChange(UserDTO user, boolean isWinner, MatchResultDTO matchResult,
-			List<UserDTO> opposingTeam) {
-		double actualOutcome = isWinner ? 1 : 0;
-		double matchWeight = calculateMatchWeight(matchResult.getWinningScore(), matchResult.getLosingScore());
+		// Update the sigma value
+		user.setSigma(calculateSigmaChange(user.getSigma()));
 
-		double totalEloChange = 0;
-		for (UserDTO opponent : opposingTeam) {
-			double winProb = winProbability(user, opponent);
-			double eloChange = K_FACTOR * matchWeight * (actualOutcome - winProb);
-			totalEloChange += eloChange;
-		}
-
-		return totalEloChange / opposingTeam.size();
+		UserEntity userEntity = userMapper.toEntity(user);
+		userRepository.save(userEntity);
 	}
 
-	private double calculateMatchWeight(int winningScore, int losingScore) {
+	private double calculateSigmaChange(double currentSigma) {
+		return currentSigma * SIGMA_DECAY_RATE;
+	}
+
+	private double calculateAverageElo(List<UserDTO> team) {
+		return team.stream().mapToDouble(UserDTO::getElo).average().orElse(INITIAL_ELO);
+	}
+
+	private double calculateAverageSigma(List<UserDTO> team) {
+		return team.stream().mapToDouble(UserDTO::getSigma).average().orElse(INITIAL_SIGMA);
+	}
+
+	private double calculateMatchWeight(Integer winningScore, Integer losingScore) {
 		double scoreDifference = Math.abs(winningScore - losingScore);
 		double totalScore = winningScore + losingScore;
 		return (scoreDifference + 1) / (totalScore + 2);
 	}
 
-	private void updateEloForUser(UserDTO user, double eloChange) {
-		int roundedEloChange = (int) Math.ceil(eloChange);
-		user.setElo(user.getElo() + roundedEloChange);
-		user.setRecentEloChange((double) roundedEloChange);
-		UserEntity userEntity = userMapper.toEntity(user);
-		userRepository.save(userEntity);
-	}
 }

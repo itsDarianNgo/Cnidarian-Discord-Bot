@@ -1,10 +1,9 @@
 package com.darianngo.discordBot.services.impl;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +37,7 @@ public class EloServiceImplTest {
 
 	@Test
 	public void testUpdateElo() {
-		MatchResultDTO matchResult = new MatchResultDTO(1L, 2L, 1L, 2L, 1L, 2L, 10, 5, new MatchDTO());
+		MatchResultDTO matchResult = new MatchResultDTO(1L, 1L, 1L, 2L, 1L, 2L, 2, 0, new MatchDTO());
 		List<Long> user1TeamIds = Arrays.asList(2L, 3L, 6L, 7L, 9L);
 		List<Long> user2TeamIds = Arrays.asList(1L, 4L, 5L, 7L, 10L);
 		List<Long> user3TeamIds = Arrays.asList(1L, 3L, 6L, 7L, 10L);
@@ -50,40 +49,70 @@ public class EloServiceImplTest {
 		List<Long> user9TeamIds = Arrays.asList(1L, 3L, 5L, 7L, 9L);
 		List<Long> user10TeamIds = Arrays.asList(2L, 4L, 6L, 8L, 10L);
 
-		UserDTO user1 = createUser("1", "User1", 1200.0, 400.0, user1TeamIds);
-		UserDTO user2 = createUser("2", "User2", 1250.0, 380.0, user2TeamIds);
-		UserDTO user3 = createUser("3", "User3", 1100.0, 370.0, user3TeamIds);
-		UserDTO user4 = createUser("4", "User4", 1150.0, 390.0, user4TeamIds);
-		UserDTO user5 = createUser("5", "User5", 1300.0, 420.0, user5TeamIds);
-		UserDTO user6 = createUser("6", "User6", 1350.0, 400.0, user6TeamIds);
-		UserDTO user7 = createUser("7", "User7", 1400.0, 430.0, user7TeamIds);
-		UserDTO user8 = createUser("8", "User8", 1450.0, 410.0, user8TeamIds);
-		UserDTO user9 = createUser("9", "User9", 1500.0, 440.0, user9TeamIds);
-		UserDTO user10 = createUser("10", "User10", 1550.0, 420.0, user10TeamIds);
+		UserDTO user1 = createUser("1", "User1", 1200.0, 200.0, user1TeamIds);
+		UserDTO user2 = createUser("2", "User2", 1250.0, 200.0, user2TeamIds);
+		UserDTO user3 = createUser("3", "User3", 900.0, 200.0, user3TeamIds);
+		UserDTO user4 = createUser("4", "User4", 1150.0, 200.0, user4TeamIds);
+		UserDTO user5 = createUser("5", "User5", 1300.0, 200.0, user5TeamIds);
+		UserDTO user6 = createUser("6", "User6", 1350.0, 200.0, user6TeamIds);
+		UserDTO user7 = createUser("7", "User7", 1400.0, 200.0, user7TeamIds);
+		UserDTO user8 = createUser("8", "User8", 1450.0, 200.0, user8TeamIds);
+		UserDTO user9 = createUser("9", "User9", 1500.0, 200.0, user9TeamIds);
+		UserDTO user10 = createUser("10", "User10", 1800.0, 200.0, user10TeamIds);
 
 		List<UserDTO> usersInMatch = Arrays.asList(user1, user2, user3, user4, user5, user6, user7, user8, user9,
 				user10);
+
+		printWinProbability(usersInMatch, (EloServiceImpl) eloService);
 		eloService.updateElo(matchResult, usersInMatch);
-		
-	    printTeamInfo(matchResult, usersInMatch);
+
+		printTeamInfo(matchResult, usersInMatch);
+
 	}
 
 	private void printTeamInfo(MatchResultDTO matchResult, List<UserDTO> usersInMatch) {
-	    System.out.println("Winning Team (Team ID: " + matchResult.getWinningTeamId() + "):");
-	    printTeam(matchResult.getWinningTeamId(), usersInMatch);
-	    System.out.println("\nLosing Team (Team ID: " + matchResult.getLosingTeamId() + "):");
-	    printTeam(matchResult.getLosingTeamId(), usersInMatch);
+		System.out.println("Winning Team (Team ID: " + matchResult.getWinningTeamId() + "):");
+		printTeam(matchResult.getWinningTeamId(), usersInMatch);
+		System.out.println("\nLosing Team (Team ID: " + matchResult.getLosingTeamId() + "):");
+		printTeam(matchResult.getLosingTeamId(), usersInMatch);
 	}
 
 	private void printTeam(Long teamId, List<UserDTO> usersInMatch) {
-	    for (UserDTO user : usersInMatch) {
-	        for (UserTeamDTO userTeam : user.getUserTeams()) {
-	            if (userTeam.getTeamId().equals(teamId)) {
-	                double oldElo = user.getElo() - user.getRecentEloChange();
-	                System.out.printf("User: %s, Elo: %.2f (%+.2f) = %.2f%n", user.getSummonerName(), oldElo, user.getRecentEloChange(), user.getElo());
-	            }
-	        }
-	    }
+		List<UserDTO> teamUsers = new ArrayList<>();
+		double teamEloSum = 0.0;
+		int numTeamUsers = 0;
+
+		for (UserDTO user : usersInMatch) {
+			for (UserTeamDTO userTeam : user.getUserTeams()) {
+				if (userTeam.getTeamId().equals(teamId)) {
+					double oldElo = user.getElo() - user.getRecentEloChange();
+					int roundedElo = (int) Math.round(user.getElo());
+					double roundedSigma = Math.round(user.getSigma() * 100.0) / 100.0;
+
+					System.out.printf("User: %s, Elo: %d (%+d) = %d, Sigma: %.2f%n", user.getSummonerName(),
+							Math.round(oldElo), Math.round(user.getRecentEloChange()), roundedElo, roundedSigma);
+
+					teamUsers.add(user);
+					teamEloSum += user.getElo();
+					numTeamUsers++;
+				}
+			}
+		}
+
+		double avgTeamElo = Math.round(teamEloSum / numTeamUsers * 100.0) / 100.0;
+		System.out.println("Avg Team Elo: " + avgTeamElo);
+	}
+
+	private void printWinProbability(List<UserDTO> usersInMatch, EloServiceImpl eloService) {
+		Map<Long, List<UserDTO>> teams = eloService.groupUsersByTeam(usersInMatch);
+		List<UserDTO> team1 = teams.get(1L);
+		List<UserDTO> team2 = teams.get(2L);
+
+		double winProbabilityTeam1 = eloService.winProbability(team1, team2) * 100;
+		double winProbabilityTeam2 = 100 - winProbabilityTeam1;
+
+		System.out.printf("\nWin Probability: Team 1: %.2f%%, Team 2: %.2f%%%n", winProbabilityTeam1,
+				winProbabilityTeam2);
 	}
 
 	private UserDTO createUser(String discordId, String summonerName, double elo, double sigma, List<Long> teamIds) {
