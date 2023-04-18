@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -36,6 +37,7 @@ public class VotingServiceImpl implements VotingService {
 	private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 	private final Map<String, AtomicInteger> usersFullyVoted = new ConcurrentHashMap<>();
 	private final Map<String, MatchResultDTO> matchResults = new HashMap<>();
+	private final Map<String, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
 
 	@Autowired
 	private MatchService matchService;
@@ -44,13 +46,15 @@ public class VotingServiceImpl implements VotingService {
 
 	@Override
 	public void startVoteCountdown(ButtonClickEvent event, String matchId) {
-		executorService.schedule(() -> {
+		ScheduledFuture<?> scheduledTask = executorService.schedule(() -> {
 			if (usersFullyVoted.get(matchId) == null || usersFullyVoted.get(matchId).get() < 2) {
 				// Send admin voting message if no majority vote or tie within 10 minutes
 				User admin = event.getJDA().retrieveUserById(event.getUser().getId()).complete();
 				sendAdminVoting(admin, matchId, matchResults.get(matchId));
 			}
-		}, 10, TimeUnit.MINUTES);
+		}, 1, TimeUnit.MINUTES);
+
+		scheduledTasks.put(matchId, scheduledTask);
 	}
 
 	@Override
@@ -162,5 +166,13 @@ public class VotingServiceImpl implements VotingService {
 		}
 
 		message.editMessageComponents(updatedActionRows).queue();
+	}
+
+	public void cancelVoteCountdown(String matchId) {
+		ScheduledFuture<?> scheduledTask = scheduledTasks.get(matchId);
+		if (scheduledTask != null) {
+			scheduledTask.cancel(false);
+			scheduledTasks.remove(matchId);
+		}
 	}
 }

@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -13,6 +14,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 public class UserEntity {
 	@Id
 	private String discordId;
@@ -22,8 +24,9 @@ public class UserEntity {
 	private String mainRole;
 	private String secondaryRole;
 	private String region;
-	private Integer elo;
-	private Integer recentEloChange;
+	private Double elo;
+	private Double recentEloChange;
+	private Double sigma;
 	private Integer totalMatches;
 	private Integer wins;
 	private Integer losses;

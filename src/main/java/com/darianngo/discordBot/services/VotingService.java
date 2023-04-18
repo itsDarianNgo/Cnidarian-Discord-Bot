@@ -13,4 +13,6 @@ public interface VotingService {
 
 	void sendVotingDM(User user, String matchId);
 
+	void cancelVoteCountdown(String matchId);
+
 }

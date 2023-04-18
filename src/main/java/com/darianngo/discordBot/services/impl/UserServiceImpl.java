@@ -8,6 +8,8 @@ import com.darianngo.discordBot.mappers.UserMapper;
 import com.darianngo.discordBot.repositories.UserRepository;
 import com.darianngo.discordBot.services.UserService;
 
+import jakarta.transaction.Transactional;
+
 @Service
 public class UserServiceImpl implements UserService {
 	private final UserRepository userRepository;
@@ -27,7 +29,7 @@ public class UserServiceImpl implements UserService {
 
 	@Override
 	public UserDTO getUserById(String id) {
-		UserEntity userEntity = userRepository.findById(id).orElse(null);
+		UserEntity userEntity = userRepository.findByIdWithUserTeams(id).orElse(null);
 		return userEntity != null ? userMapper.toDto(userEntity) : null;
 	}
 
@@ -36,7 +38,7 @@ public class UserServiceImpl implements UserService {
 		UserEntity userEntity = userRepository.findById(discordId).orElse(null);
 
 		if (userEntity == null) {
-			UserDTO newUserDTO = new UserDTO(discordId, discordName, null, ranking, null, null, null, null, null, null);
+			UserDTO newUserDTO = new UserDTO();
 			UserEntity newUser = userRepository.save(userMapper.toEntity(newUserDTO));
 			return userMapper.toDto(newUser);
 		} else {
@@ -52,8 +54,7 @@ public class UserServiceImpl implements UserService {
 		UserEntity userEntity = userRepository.findById(discordId).orElse(null);
 
 		if (userEntity == null) {
-			UserDTO newUserDTO = new UserDTO(discordId, discordName, mainRole, null, secondaryRole, null, null, null,
-					null, null);
+			UserDTO newUserDTO = new UserDTO();
 			UserEntity newUser = userRepository.save(userMapper.toEntity(newUserDTO));
 			return userMapper.toDto(newUser);
 		} else {
@@ -64,6 +65,7 @@ public class UserServiceImpl implements UserService {
 		}
 	}
 
+	@Transactional
 	@Override
 	public UserDTO updateUser(UserDTO userDTO) {
 		UserEntity userEntity = userMapper.toEntity(userDTO);
