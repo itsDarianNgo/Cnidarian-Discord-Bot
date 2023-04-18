@@ -218,6 +218,8 @@ public class ButtonClickListener extends ListenerAdapter {
 		String userVoteKey = event.getUser().getId() + "_" + matchId;
 		UserVoteDTO userVote = adminUserVotes.getOrDefault(userVoteKey, new UserVoteDTO());
 		adminUserVotes.put(userVoteKey, userVote);
+		MatchDTO match = new MatchDTO();
+		MatchResultDTO matchResult = new MatchResultDTO();
 
 		if ("team1".equals(voteType)) {
 			userVote.setTeamVote(1L);
@@ -238,7 +240,6 @@ public class ButtonClickListener extends ListenerAdapter {
 		// Check if 1 full vote has been received and process the results
 		if (userVote.getTeamVote() != null && userVote.getWinningScore() != null && userVote.getLosingScore() != null) {
 			// Update matchResult
-			MatchResultDTO matchResult = new MatchResultDTO();
 			matchResult.setMatchId(Long.parseLong(matchId));
 			matchResult.setWinningTeamNumber(userVote.getTeamVote());
 			matchResult.setLosingTeamNumber(matchResult.getWinningTeamNumber() == 1L ? 2L : 1L);
@@ -249,8 +250,10 @@ public class ButtonClickListener extends ListenerAdapter {
 			matchResult.setWinningScore(userVote.getWinningScore());
 			matchResult.setLosingScore(userVote.getLosingScore());
 
+			// Save the results to the database
+			matchService.saveMatchResult(matchResult);
+
 			// Get the match using the matchId
-			MatchDTO match = null;
 			try {
 				match = matchService.getMatchById(Long.parseLong(matchId));
 			} catch (EntityNotFoundException | NumberFormatException | NotFoundException e) {
@@ -259,15 +262,39 @@ public class ButtonClickListener extends ListenerAdapter {
 				return;
 			}
 
+			// Get the teams associated with the match
+			Map<Long, List<UserDTO>> teamsWithMatchId = matchService.getTeamsWithMatchId(Long.parseLong(matchId));
+			List<TeamDTO> teams = teamsWithMatchId.entrySet().stream().map(entry -> {
+				TeamDTO teamDTO = new TeamDTO();
+				teamDTO.setId(entry.getKey());
+				teamDTO.setMatchId(Long.parseLong(matchId));
+				teamDTO.setMembers(entry.getValue());
+				return teamDTO;
+			}).collect(Collectors.toList());
+			match.setTeams(teams);
+
 			// Get the UserDTOs for all users in the match
 			List<UserDTO> users = getUsersInMatch(match);
 			// Update ELO ratings using the eloService
 			eloService.updateElo(matchResult, users);
 
-			// Save the results to the database
-			matchService.saveMatchResult(matchResult);
-			// Display the final results in current channel
+			// Fetch updated UserEntities from the database and convert them to UserDTOs
+			List<UserDTO> updatedUsers = users.stream().map(user -> userRepository.findById(user.getDiscordId())
+					.map(userEntity -> userMapper.toDto(userEntity)).orElse(null)).collect(Collectors.toList());
+
+			// Replace existing UserDTOs in the TeamDTO objects with the updated ones
+			for (TeamDTO team : match.getTeams()) {
+				List<UserDTO> updatedTeamMembers = team.getMembers().stream()
+						.map(user -> updatedUsers.stream()
+								.filter(updatedUser -> updatedUser.getDiscordId().equals(user.getDiscordId()))
+								.findFirst().orElse(user))
+						.collect(Collectors.toList());
+				team.setMembers(updatedTeamMembers);
+			}
+
+			// Display the final results in the current channel
 			event.getChannel().sendMessageEmbeds(FinalResultEmbed.createEmbed(matchResult, match)).queue();
+
 			// Display the final results in match channel
 			matchService.sendMatchResultToDesignatedChannel(matchResult, match);
 
