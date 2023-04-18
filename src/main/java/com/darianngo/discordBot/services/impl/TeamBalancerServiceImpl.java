@@ -5,12 +5,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import com.darianngo.discordBot.dtos.UserDTO;
+import com.darianngo.discordBot.embeds.MissingEloEmbed;
 import com.darianngo.discordBot.embeds.TeamBalancerEmbed;
 import com.darianngo.discordBot.services.MatchService;
 import com.darianngo.discordBot.services.TeamBalancerService;
@@ -36,11 +38,18 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 
 	@Override
 	public MessageEmbed balanceTeams(List<String> reactions, List<UserDTO> usersReacted, Long matchId) {
+		List<UserDTO> usersWithMissingElo = usersReacted.stream().filter(user -> user.getElo() == null)
+				.collect(Collectors.toList());
+
+		if (!usersWithMissingElo.isEmpty()) {
+			return MissingEloEmbed.createEmbed(usersWithMissingElo);
+		}
+
 		List<UserDTO> team1 = new ArrayList<>();
 		List<UserDTO> team2 = new ArrayList<>();
 
 		// Sort users based on their rank
-		Collections.sort(usersReacted, Comparator.comparingInt(UserDTO::getRanking).reversed());
+		Collections.sort(usersReacted, Comparator.comparingDouble(UserDTO::getElo).reversed());
 
 		// Distribute players based on their roles and ranking
 		for (UserDTO user : usersReacted) {
@@ -101,6 +110,6 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 	}
 
 	private int calculateTeamScore(List<UserDTO> team) {
-		return team.stream().mapToInt(UserDTO::getRanking).sum();
+		return (int) team.stream().mapToDouble(UserDTO::getElo).sum();
 	}
 }
