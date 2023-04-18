@@ -8,6 +8,8 @@ import com.darianngo.discordBot.mappers.UserMapper;
 import com.darianngo.discordBot.repositories.UserRepository;
 import com.darianngo.discordBot.services.UserService;
 
+import jakarta.transaction.Transactional;
+
 @Service
 public class UserServiceImpl implements UserService {
 	private final UserRepository userRepository;
@@ -63,6 +65,7 @@ public class UserServiceImpl implements UserService {
 		}
 	}
 
+	@Transactional
 	@Override
 	public UserDTO updateUser(UserDTO userDTO) {
 		UserEntity userEntity = userMapper.toEntity(userDTO);
