@@ -71,7 +71,7 @@ public class SetupLoLProfileCommand {
 				existingUser.setRecentEloChange(0.0); // Set default recentEloChange
 			}
 			if (existingUser.getSigma() == null) {
-				existingUser.setSigma(0.0); // Set default sigma
+				existingUser.setSigma(800.0); // Set default sigma
 			}
 			if (existingUser.getTotalMatches() == null) {
 				existingUser.setTotalMatches(0); // Set default totalMatches
