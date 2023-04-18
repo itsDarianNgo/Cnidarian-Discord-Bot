@@ -9,6 +9,7 @@ import java.util.function.Consumer;
 
 import javax.annotation.Nonnull;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -125,7 +126,6 @@ public class MessageReactionListener extends ListenerAdapter {
 		}
 	}
 
-
 	private void sendMatchApprovalRequest(MessageReactionAddEvent event, List<UserDTO> usersReacted,
 			Consumer<Message> callback) {
 		String approvalChannelId = discordChannelConfig.getApprovalChannelId();
@@ -171,11 +171,19 @@ public class MessageReactionListener extends ListenerAdapter {
 					// Create a match when the approval reaction is "✅"
 					MatchDTO match = matchService.createMatch(new MatchDTO());
 					Long matchId = match.getId();
-					//Balance teams
-					MessageEmbed embed = teamBalancerService.balanceTeams(reactions, usersReacted, matchId);
-					//Create button for ending match and sending DMs to users to vote on results
-					ActionRow actionRow = ActionRow.of(Button.primary("end_match_" + matchId, "End Match: " + matchId));
-					event.getChannel().sendMessageEmbeds(embed).setActionRows(actionRow).queue();
+					// Balance teams
+					Pair<MessageEmbed, Boolean> result = teamBalancerService.balanceTeams(reactions, usersReacted,
+							matchId);
+					MessageEmbed embed = result.getLeft();
+					boolean isMissingEloEmbed = result.getRight();
+					event.getChannel().sendMessageEmbeds(embed).queue();
+
+					if (!isMissingEloEmbed) {
+						// Create button for ending match and sending DMs to users to vote on results
+						ActionRow actionRow = ActionRow
+								.of(Button.primary("end_match_" + matchId, "End Match: " + matchId));
+						event.getChannel().sendMessageEmbeds(embed).setActionRows(actionRow).queue();
+					}
 
 				} else if (approvalEvent.getReactionEmote().getEmoji().equals("❌")) {
 					event.getChannel().sendMessage("Match creation request rejected.").queue();

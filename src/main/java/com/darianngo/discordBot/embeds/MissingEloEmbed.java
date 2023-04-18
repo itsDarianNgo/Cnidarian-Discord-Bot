@@ -2,6 +2,8 @@ package com.darianngo.discordBot.embeds;
 
 import java.util.List;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import com.darianngo.discordBot.dtos.UserDTO;
 
 import net.dv8tion.jda.api.EmbedBuilder;
