@@ -110,7 +110,7 @@ public class ButtonClickListener extends ListenerAdapter {
 			User user = event.getJDA().retrieveUserById(userDTO.getDiscordId()).complete();
 			votingService.sendVotingDM(user, matchId);
 		}
-		// Start 5-minute countdown
+		// Start 10-minute countdown
 		votingService.startVoteCountdown(event, matchId);
 
 		// Disable the "End Match" button
@@ -335,8 +335,8 @@ public class ButtonClickListener extends ListenerAdapter {
 				sendApprovalRequest(event, matchResult, matchId);
 				usersFullyVoted.remove(matchId);
 
-				// Cancel scheduled admin voting
-				executorService.shutdown();
+				// Cancel the scheduled admin voting
+				votingService.cancelVoteCountdown(matchId);
 
 			}
 		}
