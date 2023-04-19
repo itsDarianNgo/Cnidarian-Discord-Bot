@@ -4,8 +4,10 @@ import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -51,11 +53,6 @@ public class ButtonClickListener extends ListenerAdapter {
 	private final MatchResultService matchResultService;
 	private final UserMapper userMapper;
 	private final UserRepository userRepository;
-	private Map<String, UserVoteDTO> userVotes = new ConcurrentHashMap<>();
-	private final Map<String, MatchResultDTO> matchResults = new HashMap<>();
-	private final Map<String, AtomicInteger> usersFullyVoted = new ConcurrentHashMap<>();
-	private Map<String, UserVoteDTO> adminUserVotes = new ConcurrentHashMap<>();
-	private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 
 	public ButtonClickListener(MatchService matchService, VotingService votingService, UserService userService,
 			EloService eloService, MatchResultService matchResultService, UserMapper userMapper,
@@ -71,6 +68,13 @@ public class ButtonClickListener extends ListenerAdapter {
 
 	@Autowired
 	private DiscordChannelConfig discordChannelConfig;
+
+	private Map<String, UserVoteDTO> userVotes = new ConcurrentHashMap<>();
+	private final Map<String, MatchResultDTO> matchResults = new HashMap<>();
+	private final Map<String, AtomicInteger> usersFullyVoted = new ConcurrentHashMap<>();
+	private Map<String, UserVoteDTO> adminUserVotes = new ConcurrentHashMap<>();
+	private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
+	private final Set<String> usersWhoVoted = Collections.synchronizedSet(new HashSet<>());
 
 	@Override
 	public void onButtonClick(ButtonClickEvent event) {
@@ -307,6 +311,13 @@ public class ButtonClickListener extends ListenerAdapter {
 		String voteType = buttonIdParts[1];
 		String matchId = buttonIdParts[2];
 		String userVoteKey = event.getUser().getId() + "_" + matchId;
+
+		// Check if the user has already voted
+		if (usersWhoVoted.contains(userVoteKey)) {
+			event.reply("You can only vote once per match.").setEphemeral(true).queue();
+			return;
+		}
+
 		UserVoteDTO userVote = userVotes.getOrDefault(userVoteKey, new UserVoteDTO());
 		userVotes.put(userVoteKey, userVote);
 
@@ -334,6 +345,9 @@ public class ButtonClickListener extends ListenerAdapter {
 				// Calculate the majority vote for the winning team and score
 				Map<Long, Integer> teamVoteCounts = new HashMap<>();
 				Map<String, Integer> scoreVoteCounts = new HashMap<>();
+
+				// Add the user ID to the usersWhoVoted set
+				usersWhoVoted.add(userVoteKey);
 
 				for (UserVoteDTO vote : userVotes.values()) {
 					if (vote.getTeamVote() != null && vote.getWinningScore() != null && vote.getLosingScore() != null) {

@@ -89,7 +89,7 @@ public class MessageReactionListener extends ListenerAdapter {
 				int realUsersCount = reactionCount - 1;
 
 				// Check if the number of real users who reacted is 10 or less
-				if (realUsersCount == 10) {
+				if (realUsersCount == 2) {
 					List<String> reactions = Collections.singletonList("👍");
 					List<UserDTO> usersReacted = new ArrayList<>();
 
