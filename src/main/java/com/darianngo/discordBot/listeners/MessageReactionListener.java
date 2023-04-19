@@ -167,7 +167,9 @@ public class MessageReactionListener extends ListenerAdapter {
 					return;
 				}
 
-				if (approvalEvent.getReactionEmote().getEmoji().equals("✅")) {
+				String addedReaction = approvalEvent.getReactionEmote().getEmoji();
+
+				if (addedReaction.equals("✅")) {
 					// Create a match when the approval reaction is "✅"
 					MatchDTO match = matchService.createMatch(new MatchDTO());
 					Long matchId = match.getId();
@@ -184,13 +186,15 @@ public class MessageReactionListener extends ListenerAdapter {
 						event.getChannel().sendMessageEmbeds(embed).setActionRows(actionRow).queue();
 					}
 
-				} else if (approvalEvent.getReactionEmote().getEmoji().equals("❌")) {
-					event.getChannel().sendMessage("Match creation request rejected.").queue();
-				}
+					event.getJDA().removeEventListener(this);
 
-				event.getJDA().removeEventListener(this);
+				} else if (addedReaction.equals("❌")) {
+					event.getChannel().sendMessage("Match creation request rejected.").queue();
+					event.getJDA().removeEventListener(this);
+				}
 			}
 		});
 
 	}
+
 }
