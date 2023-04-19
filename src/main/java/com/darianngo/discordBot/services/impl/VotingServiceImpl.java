@@ -52,7 +52,7 @@ public class VotingServiceImpl implements VotingService {
 				User admin = event.getJDA().retrieveUserById(event.getUser().getId()).complete();
 				sendAdminVoting(admin, matchId, matchResults.get(matchId));
 			}
-		}, 1, TimeUnit.MINUTES);
+		}, 5, TimeUnit.MINUTES);
 
 		scheduledTasks.put(matchId, scheduledTask);
 	}

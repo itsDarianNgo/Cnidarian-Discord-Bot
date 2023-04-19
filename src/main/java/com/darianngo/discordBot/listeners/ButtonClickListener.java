@@ -110,7 +110,7 @@ public class ButtonClickListener extends ListenerAdapter {
 			User user = event.getJDA().retrieveUserById(userDTO.getDiscordId()).complete();
 			votingService.sendVotingDM(user, matchId);
 		}
-		// Start 10-minute countdown
+		// Start 5-minute countdown
 		votingService.startVoteCountdown(event, matchId);
 
 		// Disable the "End Match" button
