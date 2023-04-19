@@ -102,7 +102,8 @@ public class ButtonClickListener extends ListenerAdapter {
 	private void handleCancelButtonClick(ButtonClickEvent event) {
 		String componentId = event.getComponentId();
 		if (!componentId.startsWith("cancel_match_")) {
-			return;
+			return; // Ignore the button click if the component ID does not start with
+					// "cancel_match_".
 		}
 
 		String matchId = componentId.substring("cancel_match_".length());
@@ -110,8 +111,16 @@ public class ButtonClickListener extends ListenerAdapter {
 
 		// Remove the "End Match" and "Cancel Match" buttons
 		removeButtons(event.getMessage(), "end_match_" + matchId, "cancel_match_" + matchId);
-		// Send a message to the channel indicating that the match was cancelled
-		event.getChannel().sendMessage("Match " + matchId + " has been cancelled.").queue();
+
+		// Get the discordId of the user who clicked the button
+		long discordId = event.getUser().getIdLong();
+
+		// Retrieve the user's name and send a message with their name
+		event.getJDA().retrieveUserById(discordId).queue(user -> {
+			String userName = user.getName();
+			event.getChannel().sendMessage("Match " + matchId + " has been cancelled by " +"<@" + discordId
+					+ ">.").queue();
+		});
 	}
 
 	private void handleEndButtonClick(ButtonClickEvent event) {
@@ -138,8 +147,16 @@ public class ButtonClickListener extends ListenerAdapter {
 
 		// Remove the "End Match" and "Cancel Match" buttons
 		removeButtons(event.getMessage(), "end_match_" + matchId, "cancel_match_" + matchId);
-		// Send a message to the channel indicating that the match has ended
-		event.getChannel().sendMessage("Match " + matchId + " has ended. Check your DMs to vote for the winner!").queue();
+
+		// Get the discordId of the user who clicked the button
+		long discordId = event.getUser().getIdLong();
+
+		// Retrieve the user's name and send a message with their name and an @mention
+		event.getJDA().retrieveUserById(discordId).queue(user -> {
+			String userName = user.getName();
+			event.getChannel().sendMessage("Match " + matchId + " was ended by " + "<@" + discordId
+					+ ">. Check your DMs to vote for the winner!").queue();
+		});
 	}
 
 	private void handleApproveButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
