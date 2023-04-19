@@ -75,6 +75,7 @@ public class ButtonClickListener extends ListenerAdapter {
 	private Map<String, UserVoteDTO> adminUserVotes = new ConcurrentHashMap<>();
 	private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 	private final Set<String> usersWhoVoted = Collections.synchronizedSet(new HashSet<>());
+	private final ConcurrentHashMap<String, Boolean> majorityReached = new ConcurrentHashMap<>();
 
 	@Override
 	public void onButtonClick(ButtonClickEvent event) {
@@ -361,24 +362,29 @@ public class ButtonClickListener extends ListenerAdapter {
 					return;
 				}
 
-				long winningTeam = teamVoteCounts.entrySet().stream().max(Map.Entry.comparingByValue()).get().getKey();
-				String winningScore = scoreVoteCounts.entrySet().stream().max(Map.Entry.comparingByValue()).get()
-						.getKey();
+				// Check if the majority vote has already been reached
+				if (!majorityReached.getOrDefault(matchId, false)) {
 
-				// Update matchResult
-				MatchResultDTO matchResult = new MatchResultDTO();
-				matchResult.setMatchId(Long.parseLong(matchId));
-				matchResult.setWinningTeamNumber(winningTeam);
-				matchResult.setWinningScore(Integer.parseInt(winningScore.split("-")[0]));
-				matchResult.setLosingScore(Integer.parseInt(winningScore.split("-")[1]));
+					long winningTeam = teamVoteCounts.entrySet().stream().max(Map.Entry.comparingByValue()).get()
+							.getKey();
+					String winningScore = scoreVoteCounts.entrySet().stream().max(Map.Entry.comparingByValue()).get()
+							.getKey();
 
-				// Send the approval request
-				sendApprovalRequest(event, matchResult, matchId);
-				usersFullyVoted.remove(matchId);
+					// Update matchResult
+					MatchResultDTO matchResult = new MatchResultDTO();
+					matchResult.setMatchId(Long.parseLong(matchId));
+					matchResult.setWinningTeamNumber(winningTeam);
+					matchResult.setWinningScore(Integer.parseInt(winningScore.split("-")[0]));
+					matchResult.setLosingScore(Integer.parseInt(winningScore.split("-")[1]));
 
-				// Cancel the scheduled admin voting
-				votingService.cancelVoteCountdown(matchId);
+					// Send the approval request
+					sendApprovalRequest(event, matchResult, matchId);
+					usersFullyVoted.remove(matchId);
+					majorityReached.put(matchId, true); // Set the majorityReached flag to true
 
+					// Cancel the scheduled admin voting
+					votingService.cancelVoteCountdown(matchId);
+				}
 			}
 		}
 	}
