@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -37,12 +38,12 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 	}
 
 	@Override
-	public MessageEmbed balanceTeams(List<String> reactions, List<UserDTO> usersReacted, Long matchId) {
+	public Pair<MessageEmbed, Boolean> balanceTeams(List<String> reactions, List<UserDTO> usersReacted, Long matchId) {
 		List<UserDTO> usersWithMissingElo = usersReacted.stream().filter(user -> user.getElo() == null)
 				.collect(Collectors.toList());
 
 		if (!usersWithMissingElo.isEmpty()) {
-			return MissingEloEmbed.createEmbed(usersWithMissingElo);
+			return Pair.of(MissingEloEmbed.createEmbed(usersWithMissingElo), true);
 		}
 
 		List<UserDTO> team1 = new ArrayList<>();
@@ -85,11 +86,11 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 				}
 			}
 		}
-// Build Embed
+		// Build Embed
 		int eloDifference = Math.abs(calculateTeamScore(team1) - calculateTeamScore(team2));
 		// Save teams to the database
 		matchService.saveTeamsWithMatchId(team1, team2, matchId);
-		return TeamBalancerEmbed.createEmbed(team1, team2, eloDifference, matchId);
+		return Pair.of(TeamBalancerEmbed.createEmbed(team1, team2, eloDifference, matchId), false);
 	}
 
 	// Create a custom game
