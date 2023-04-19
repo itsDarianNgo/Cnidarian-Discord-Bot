@@ -52,7 +52,7 @@ public class SetupLoLProfileCommand {
 			newUser.setSecondaryRole(secondaryRole);
 			newUser.setElo(1200.0); // Set default elo here
 			newUser.setRecentEloChange(0.0); // Set default recentEloChange
-			newUser.setSigma(0.0); // Set default sigma
+			newUser.setSigma(800.0); // Set default sigma
 			newUser.setTotalMatches(0); // Set default totalMatches
 			newUser.setWins(0); // Set default wins
 			newUser.setLosses(0); // Set default losses
