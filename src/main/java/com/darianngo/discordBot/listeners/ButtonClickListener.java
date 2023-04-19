@@ -2,6 +2,7 @@ package com.darianngo.discordBot.listeners;
 
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -92,8 +93,25 @@ public class ButtonClickListener extends ListenerAdapter {
 			handleRejectButtonClick(event, buttonIdParts);
 		} else if ("admin".equals(action)) {
 			handleAdminVoteButtonClick(event, buttonIdParts);
+		} else if ("cancel".equals(action)) {
+			handleCancelButtonClick(event);
 		}
 		event.deferEdit().queue(); // Acknowledge the event
+	}
+
+	private void handleCancelButtonClick(ButtonClickEvent event) {
+		String componentId = event.getComponentId();
+		if (!componentId.startsWith("cancel_match_")) {
+			return;
+		}
+
+		String matchId = componentId.substring("cancel_match_".length());
+		matchService.cancelMatch(Long.parseLong(matchId)); // Cancel the match in the service layer
+
+		// Remove the "End Match" and "Cancel Match" buttons
+		removeButtons(event.getMessage(), "end_match_" + matchId, "cancel_match_" + matchId);
+		// Send a message to the channel indicating that the match was cancelled
+		event.getChannel().sendMessage("Match " + matchId + " has been cancelled.").queue();
 	}
 
 	private void handleEndButtonClick(ButtonClickEvent event) {
@@ -118,8 +136,10 @@ public class ButtonClickListener extends ListenerAdapter {
 		// Start 5-minute countdown
 		votingService.startVoteCountdown(event, matchId);
 
-		// Disable the "End Match" button
-		disableButton(event.getMessage(), "end_match_" + matchId);
+		// Remove the "End Match" and "Cancel Match" buttons
+		removeButtons(event.getMessage(), "end_match_" + matchId, "cancel_match_" + matchId);
+		// Send a message to the channel indicating that the match has ended
+		event.getChannel().sendMessage("Match " + matchId + " has ended. Check your DMs to vote for the winner!").queue();
 	}
 
 	private void handleApproveButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
@@ -418,11 +438,33 @@ public class ButtonClickListener extends ListenerAdapter {
 					updatedComponents.add(component);
 				}
 			}
-
 			updatedActionRows.add(ActionRow.of(updatedComponents));
+		}
+		message.editMessageComponents(updatedActionRows).queue();
+	}
+
+	private void removeButtons(Message message, String... buttonIds) {
+		List<String> buttonIdsToRemove = Arrays.asList(buttonIds);
+		List<ActionRow> actionRows = message.getActionRows();
+		List<ActionRow> updatedActionRows = new ArrayList<>();
+
+		for (ActionRow actionRow : actionRows) {
+			List<Component> updatedComponents = new ArrayList<>();
+
+			for (Component component : actionRow.getComponents()) {
+				if (component instanceof Button) {
+					Button button = (Button) component;
+					if (buttonIdsToRemove.contains(button.getId())) {
+						continue; // Skip buttons with IDs that need to be removed
+					}
+				}
+				updatedComponents.add(component);
+			}
+			if (!updatedComponents.isEmpty()) {
+				updatedActionRows.add(ActionRow.of(updatedComponents));
+			}
 		}
 
 		message.editMessageComponents(updatedActionRows).queue();
 	}
-
 }

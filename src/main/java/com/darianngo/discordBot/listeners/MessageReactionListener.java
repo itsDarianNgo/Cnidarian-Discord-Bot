@@ -180,9 +180,11 @@ public class MessageReactionListener extends ListenerAdapter {
 					boolean isMissingEloEmbed = result.getRight();
 
 					if (!isMissingEloEmbed) {
-						// Create button for ending match and sending DMs to users to vote on results
-						ActionRow actionRow = ActionRow
-								.of(Button.primary("end_match_" + matchId, "End Match: " + matchId));
+						// Create buttons for ending match, canceling match, and sending DMs to users to
+						// vote on results
+						ActionRow actionRow = ActionRow.of(
+								Button.primary("end_match_" + matchId, "End Match"),
+								Button.danger("cancel_match_" + matchId, "Cancel Match"));
 						event.getChannel().sendMessageEmbeds(embed).setActionRows(actionRow).queue();
 					}
 
