@@ -2,10 +2,13 @@ package com.darianngo.discordBot.listeners;
 
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -51,11 +54,6 @@ public class ButtonClickListener extends ListenerAdapter {
 	private final MatchResultService matchResultService;
 	private final UserMapper userMapper;
 	private final UserRepository userRepository;
-	private Map<String, UserVoteDTO> userVotes = new ConcurrentHashMap<>();
-	private final Map<String, MatchResultDTO> matchResults = new HashMap<>();
-	private final Map<String, AtomicInteger> usersFullyVoted = new ConcurrentHashMap<>();
-	private Map<String, UserVoteDTO> adminUserVotes = new ConcurrentHashMap<>();
-	private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 
 	public ButtonClickListener(MatchService matchService, VotingService votingService, UserService userService,
 			EloService eloService, MatchResultService matchResultService, UserMapper userMapper,
@@ -72,6 +70,14 @@ public class ButtonClickListener extends ListenerAdapter {
 	@Autowired
 	private DiscordChannelConfig discordChannelConfig;
 
+	private Map<String, UserVoteDTO> userVotes = new ConcurrentHashMap<>();
+	private final Map<String, MatchResultDTO> matchResults = new HashMap<>();
+	private final Map<String, AtomicInteger> usersFullyVoted = new ConcurrentHashMap<>();
+	private Map<String, UserVoteDTO> adminUserVotes = new ConcurrentHashMap<>();
+	private final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
+	private final Set<String> usersWhoVoted = Collections.synchronizedSet(new HashSet<>());
+	private final ConcurrentHashMap<String, Boolean> majorityReached = new ConcurrentHashMap<>();
+
 	@Override
 	public void onButtonClick(ButtonClickEvent event) {
 		String[] buttonIdParts = event.getComponentId().split("_");
@@ -87,8 +93,34 @@ public class ButtonClickListener extends ListenerAdapter {
 			handleRejectButtonClick(event, buttonIdParts);
 		} else if ("admin".equals(action)) {
 			handleAdminVoteButtonClick(event, buttonIdParts);
+		} else if ("cancel".equals(action)) {
+			handleCancelButtonClick(event);
 		}
 		event.deferEdit().queue(); // Acknowledge the event
+	}
+
+	private void handleCancelButtonClick(ButtonClickEvent event) {
+		String componentId = event.getComponentId();
+		if (!componentId.startsWith("cancel_match_")) {
+			return; // Ignore the button click if the component ID does not start with
+					// "cancel_match_".
+		}
+
+		String matchId = componentId.substring("cancel_match_".length());
+		matchService.cancelMatch(Long.parseLong(matchId)); // Cancel the match in the service layer
+
+		// Remove the "End Match" and "Cancel Match" buttons
+		removeButtons(event.getMessage(), "end_match_" + matchId, "cancel_match_" + matchId);
+
+		// Get the discordId of the user who clicked the button
+		long discordId = event.getUser().getIdLong();
+
+		// Retrieve the user's name and send a message with their name
+		event.getJDA().retrieveUserById(discordId).queue(user -> {
+			String userName = user.getName();
+			event.getChannel().sendMessage("Match " + matchId + " has been cancelled by " +"<@" + discordId
+					+ ">.").queue();
+		});
 	}
 
 	private void handleEndButtonClick(ButtonClickEvent event) {
@@ -113,8 +145,18 @@ public class ButtonClickListener extends ListenerAdapter {
 		// Start 5-minute countdown
 		votingService.startVoteCountdown(event, matchId);
 
-		// Disable the "End Match" button
-		disableButton(event.getMessage(), "end_match_" + matchId);
+		// Remove the "End Match" and "Cancel Match" buttons
+		removeButtons(event.getMessage(), "end_match_" + matchId, "cancel_match_" + matchId);
+
+		// Get the discordId of the user who clicked the button
+		long discordId = event.getUser().getIdLong();
+
+		// Retrieve the user's name and send a message with their name and an @mention
+		event.getJDA().retrieveUserById(discordId).queue(user -> {
+			String userName = user.getName();
+			event.getChannel().sendMessage("Match " + matchId + " was ended by " + "<@" + discordId
+					+ ">. Check your DMs to vote for the winner!").queue();
+		});
 	}
 
 	private void handleApproveButtonClick(ButtonClickEvent event, String[] buttonIdParts) {
@@ -307,6 +349,13 @@ public class ButtonClickListener extends ListenerAdapter {
 		String voteType = buttonIdParts[1];
 		String matchId = buttonIdParts[2];
 		String userVoteKey = event.getUser().getId() + "_" + matchId;
+
+		// Check if the user has already voted
+		if (usersWhoVoted.contains(userVoteKey)) {
+			event.reply("You can only vote once per match.").setEphemeral(true).queue();
+			return;
+		}
+
 		UserVoteDTO userVote = userVotes.getOrDefault(userVoteKey, new UserVoteDTO());
 		userVotes.put(userVoteKey, userVote);
 
@@ -335,6 +384,9 @@ public class ButtonClickListener extends ListenerAdapter {
 				Map<Long, Integer> teamVoteCounts = new HashMap<>();
 				Map<String, Integer> scoreVoteCounts = new HashMap<>();
 
+				// Add the user ID to the usersWhoVoted set
+				usersWhoVoted.add(userVoteKey);
+
 				for (UserVoteDTO vote : userVotes.values()) {
 					if (vote.getTeamVote() != null && vote.getWinningScore() != null && vote.getLosingScore() != null) {
 						teamVoteCounts.put(vote.getTeamVote(), teamVoteCounts.getOrDefault(vote.getTeamVote(), 0) + 1);
@@ -347,24 +399,29 @@ public class ButtonClickListener extends ListenerAdapter {
 					return;
 				}
 
-				long winningTeam = teamVoteCounts.entrySet().stream().max(Map.Entry.comparingByValue()).get().getKey();
-				String winningScore = scoreVoteCounts.entrySet().stream().max(Map.Entry.comparingByValue()).get()
-						.getKey();
+				// Check if the majority vote has already been reached
+				if (!majorityReached.getOrDefault(matchId, false)) {
 
-				// Update matchResult
-				MatchResultDTO matchResult = new MatchResultDTO();
-				matchResult.setMatchId(Long.parseLong(matchId));
-				matchResult.setWinningTeamNumber(winningTeam);
-				matchResult.setWinningScore(Integer.parseInt(winningScore.split("-")[0]));
-				matchResult.setLosingScore(Integer.parseInt(winningScore.split("-")[1]));
+					long winningTeam = teamVoteCounts.entrySet().stream().max(Map.Entry.comparingByValue()).get()
+							.getKey();
+					String winningScore = scoreVoteCounts.entrySet().stream().max(Map.Entry.comparingByValue()).get()
+							.getKey();
 
-				// Send the approval request
-				sendApprovalRequest(event, matchResult, matchId);
-				usersFullyVoted.remove(matchId);
+					// Update matchResult
+					MatchResultDTO matchResult = new MatchResultDTO();
+					matchResult.setMatchId(Long.parseLong(matchId));
+					matchResult.setWinningTeamNumber(winningTeam);
+					matchResult.setWinningScore(Integer.parseInt(winningScore.split("-")[0]));
+					matchResult.setLosingScore(Integer.parseInt(winningScore.split("-")[1]));
 
-				// Cancel the scheduled admin voting
-				votingService.cancelVoteCountdown(matchId);
+					// Send the approval request
+					sendApprovalRequest(event, matchResult, matchId);
+					usersFullyVoted.remove(matchId);
+					majorityReached.put(matchId, true); // Set the majorityReached flag to true
 
+					// Cancel the scheduled admin voting
+					votingService.cancelVoteCountdown(matchId);
+				}
 			}
 		}
 	}
@@ -398,11 +455,33 @@ public class ButtonClickListener extends ListenerAdapter {
 					updatedComponents.add(component);
 				}
 			}
-
 			updatedActionRows.add(ActionRow.of(updatedComponents));
+		}
+		message.editMessageComponents(updatedActionRows).queue();
+	}
+
+	private void removeButtons(Message message, String... buttonIds) {
+		List<String> buttonIdsToRemove = Arrays.asList(buttonIds);
+		List<ActionRow> actionRows = message.getActionRows();
+		List<ActionRow> updatedActionRows = new ArrayList<>();
+
+		for (ActionRow actionRow : actionRows) {
+			List<Component> updatedComponents = new ArrayList<>();
+
+			for (Component component : actionRow.getComponents()) {
+				if (component instanceof Button) {
+					Button button = (Button) component;
+					if (buttonIdsToRemove.contains(button.getId())) {
+						continue; // Skip buttons with IDs that need to be removed
+					}
+				}
+				updatedComponents.add(component);
+			}
+			if (!updatedComponents.isEmpty()) {
+				updatedActionRows.add(ActionRow.of(updatedComponents));
+			}
 		}
 
 		message.editMessageComponents(updatedActionRows).queue();
 	}
-
 }

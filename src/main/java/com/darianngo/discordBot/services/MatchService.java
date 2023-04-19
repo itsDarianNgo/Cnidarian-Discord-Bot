@@ -34,4 +34,6 @@ public interface MatchService {
 
 	void sendMatchResultToDesignatedChannel(MatchResultDTO matchResult, MatchDTO match);
 
+	void cancelMatch(Long matchId);
+
 }

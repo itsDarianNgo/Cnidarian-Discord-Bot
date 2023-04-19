@@ -79,6 +79,14 @@ public class MatchServiceImpl implements MatchService {
 	}
 
 	@Override
+	public void cancelMatch(Long matchId) {
+		MatchEntity matchEntity = matchRepository.findById(matchId)
+				.orElseThrow(() -> new IllegalArgumentException("Match not found with id: " + matchId));
+
+		matchRepository.delete(matchEntity); // Delete the match from the database
+	}
+
+	@Override
 	public MatchDTO createMatch(MatchDTO matchDTO) {
 		MatchEntity match = matchMapper.toEntity(matchDTO);
 		MatchEntity savedMatch = matchRepository.save(match);
@@ -117,6 +125,7 @@ public class MatchServiceImpl implements MatchService {
 		}
 
 	}
+
 	@Transactional
 	@Override
 	public Map<Long, List<UserDTO>> getTeamsWithMatchId(Long matchId) {

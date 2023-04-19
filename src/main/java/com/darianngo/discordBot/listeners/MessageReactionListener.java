@@ -89,7 +89,7 @@ public class MessageReactionListener extends ListenerAdapter {
 				int realUsersCount = reactionCount - 1;
 
 				// Check if the number of real users who reacted is 10 or less
-				if (realUsersCount == 10) {
+				if (realUsersCount == 2) {
 					List<String> reactions = Collections.singletonList("👍");
 					List<UserDTO> usersReacted = new ArrayList<>();
 
@@ -167,7 +167,9 @@ public class MessageReactionListener extends ListenerAdapter {
 					return;
 				}
 
-				if (approvalEvent.getReactionEmote().getEmoji().equals("✅")) {
+				String addedReaction = approvalEvent.getReactionEmote().getEmoji();
+
+				if (addedReaction.equals("✅")) {
 					// Create a match when the approval reaction is "✅"
 					MatchDTO match = matchService.createMatch(new MatchDTO());
 					Long matchId = match.getId();
@@ -178,19 +180,23 @@ public class MessageReactionListener extends ListenerAdapter {
 					boolean isMissingEloEmbed = result.getRight();
 
 					if (!isMissingEloEmbed) {
-						// Create button for ending match and sending DMs to users to vote on results
-						ActionRow actionRow = ActionRow
-								.of(Button.primary("end_match_" + matchId, "End Match: " + matchId));
+						// Create buttons for ending match, canceling match, and sending DMs to users to
+						// vote on results
+						ActionRow actionRow = ActionRow.of(
+								Button.primary("end_match_" + matchId, "End Match"),
+								Button.danger("cancel_match_" + matchId, "Cancel Match"));
 						event.getChannel().sendMessageEmbeds(embed).setActionRows(actionRow).queue();
 					}
 
-				} else if (approvalEvent.getReactionEmote().getEmoji().equals("❌")) {
-					event.getChannel().sendMessage("Match creation request rejected.").queue();
-				}
+					event.getJDA().removeEventListener(this);
 
-				event.getJDA().removeEventListener(this);
+				} else if (addedReaction.equals("❌")) {
+					event.getChannel().sendMessage("Match creation request rejected.").queue();
+					event.getJDA().removeEventListener(this);
+				}
 			}
 		});
 
 	}
+
 }
