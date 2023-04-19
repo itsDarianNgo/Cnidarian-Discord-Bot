@@ -23,7 +23,7 @@ public class CreateCustomGameCommand {
 	    String amPm = event.getOption("am_pm").getAsString();
 	    EmbedBuilder embedBuilder = new EmbedBuilder();
 	    embedBuilder.setTitle("Custom Game");
-	    embedBuilder.setDescription("Time to play: **" + timeToPlay + " " + amPm + "**");
+	    embedBuilder.setDescription("Time to play: **" + timeToPlay + " " + amPm + "**" + "CT");
 	    embedBuilder.setColor(Color.BLUE);
 
 	    event.reply("@everyone").addEmbeds(embedBuilder.build()).queue(interactionHook -> {
