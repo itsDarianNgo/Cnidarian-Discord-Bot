@@ -145,7 +145,7 @@ public class MessageReactionListener extends ListenerAdapter {
 
 		StringBuilder usersBuilder = new StringBuilder();
 		for (UserDTO userDTO : usersReacted) {
-			usersBuilder.append("<@").append(userDTO.getDiscordId()).append("> (").append(userDTO.getRanking())
+			usersBuilder.append("<@").append(userDTO.getDiscordId()).append("> (").append(Math.round(userDTO.getElo()))
 					.append(")\n");
 		}
 		embedBuilder.addField("Users:", usersBuilder.toString(), false);
@@ -176,7 +176,6 @@ public class MessageReactionListener extends ListenerAdapter {
 							matchId);
 					MessageEmbed embed = result.getLeft();
 					boolean isMissingEloEmbed = result.getRight();
-					event.getChannel().sendMessageEmbeds(embed).queue();
 
 					if (!isMissingEloEmbed) {
 						// Create button for ending match and sending DMs to users to vote on results
