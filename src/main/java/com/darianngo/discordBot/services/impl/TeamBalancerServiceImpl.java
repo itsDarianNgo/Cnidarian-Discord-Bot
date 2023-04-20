@@ -112,7 +112,7 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 	}
 
 	private void adjustEloBalance(List<UserDTO> team1, List<UserDTO> team2) {
-		int acceptableEloDifference = 250; // Set an acceptable Elo difference threshold
+		int acceptableEloDifference = 180; // Set an acceptable Elo difference threshold
 		int eloDifference = Math.abs(calculateTeamScore(team1) - calculateTeamScore(team2));
 
 		if (eloDifference <= acceptableEloDifference) {

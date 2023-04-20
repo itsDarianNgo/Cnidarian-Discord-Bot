@@ -16,7 +16,7 @@ public class FinalResultEmbed {
 		embedBuilder.setTitle("Final Match Result");
 		embedBuilder.setDescription("The final result for match " + matchResult.getMatchId() + " is:");
 		embedBuilder.addField("Winning Team", "Team " + matchResult.getWinningTeamNumber(), false);
-		embedBuilder.addField("Score", matchResult.getWinningScore() + "-" + matchResult.getLosingScore(), false);
+		embedBuilder.addField("Score", matchResult.getWinningScore() + "- " + matchResult.getLosingScore(), false);
 
 		StringBuilder team1Members = new StringBuilder();
 		for (UserDTO user : match.getTeams().get(0).getMembers()) {
