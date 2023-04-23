@@ -10,12 +10,21 @@ import net.dv8tion.jda.api.entities.MessageEmbed;
 public class TeamBalancerEmbed {
 
 	public static MessageEmbed createEmbed(List<UserDTO> team1, List<UserDTO> team2, int eloDifference, Long matchId) {
+		// Calculate average Elos
+		int team1EloSum = (int) team1.stream().mapToDouble(UserDTO::getElo).sum();
+		int team2EloSum = (int) team2.stream().mapToDouble(UserDTO::getElo).sum();
+
+		float team1AverageElo = (float) team1EloSum / team1.size();
+		float team2AverageElo = (float) team2EloSum / team2.size();
+
+		// Calculate the average Elo difference
+		float averageEloDifference = Math.abs(team1AverageElo - team2AverageElo);
 
 		// Build the embed
 		EmbedBuilder embedBuilder = new EmbedBuilder();
 		embedBuilder.setTitle("Queue Popped!");
 		embedBuilder.addField("MATCH ID:", matchId.toString(), false);
-		embedBuilder.addField("Elo difference:", String.valueOf(eloDifference), false);
+		embedBuilder.addField("Elo difference:", String.format("%.1f", averageEloDifference), false);
 
 		StringBuilder team1Builder = new StringBuilder();
 		for (UserDTO userDTO : team1) {
@@ -29,9 +38,12 @@ public class TeamBalancerEmbed {
 					.append(")\n");
 		}
 
-		embedBuilder.addField("🟦 " + "Team 1", team1Builder.toString(), true);
-		embedBuilder.addField("🟥 " + "Team 2", team2Builder.toString(), true);
+		embedBuilder.addField("🟦 " + "Team 1 (Avg Elo: " + String.format("%.1f", team1AverageElo) + ")",
+				team1Builder.toString(), true);
+		embedBuilder.addField("🟥 " + "Team 2 (Avg Elo: " + String.format("%.1f", team2AverageElo) + ")",
+				team2Builder.toString(), true);
 
 		return embedBuilder.build();
 	}
+
 }
