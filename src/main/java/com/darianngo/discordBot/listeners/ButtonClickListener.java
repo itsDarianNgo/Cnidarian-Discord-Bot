@@ -375,10 +375,10 @@ public class ButtonClickListener extends ListenerAdapter {
 			disableButton(event.getMessage(), "vote_score20_" + matchId);
 		}
 
-		// Check if 2 votes have been received and process the results
+		// Check if 7 votes have been received and process the results
 		usersFullyVoted.putIfAbsent(matchId, new AtomicInteger(0));
 		if (userVote.getTeamVote() != null && userVote.getWinningScore() != null && userVote.getLosingScore() != null) {
-			if (usersFullyVoted.get(matchId).incrementAndGet() >= 2) {
+			if (usersFullyVoted.get(matchId).incrementAndGet() >= 7) {
 
 				// Calculate the majority vote for the winning team and score
 				Map<Long, Integer> teamVoteCounts = new HashMap<>();

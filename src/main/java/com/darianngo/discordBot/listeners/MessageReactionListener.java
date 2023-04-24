@@ -88,7 +88,7 @@ public class MessageReactionListener extends ListenerAdapter {
 				// Subtract 1 from the reactionCount to exclude the bot
 				int realUsersCount = reactionCount - 1;
 
-				// Check if the number of real users who reacted is 10 or less
+				// Check if the number of real users who reacted is 10
 				if (realUsersCount == 10) {
 					List<String> reactions = Collections.singletonList("👍");
 					List<UserDTO> usersReacted = new ArrayList<>();

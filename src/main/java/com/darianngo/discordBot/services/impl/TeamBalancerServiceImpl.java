@@ -1,12 +1,10 @@
 package com.darianngo.discordBot.services.impl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -48,93 +46,65 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 			return Pair.of(MissingEloEmbed.createEmbed(usersWithMissingElo), true);
 		}
 
-		Map<String, List<UserDTO>> roleGroups = groupPlayersByRole(usersReacted);
 		List<UserDTO> team1 = new ArrayList<>();
 		List<UserDTO> team2 = new ArrayList<>();
-		Set<String> assignedUsers = new HashSet<>();
 
-		// If it's impossible to assign every player to their preferred role, try to
-		// assign them to their secondary role
-		for (String role : roleGroups.keySet()) {
-			List<UserDTO> roleGroup = roleGroups.get(role);
-			roleGroup.sort(Comparator.comparingDouble(UserDTO::getElo).reversed());
+		// Sort users based on their rank
+		Collections.sort(usersReacted, Comparator.comparingDouble(UserDTO::getElo).reversed());
 
-			for (UserDTO user : roleGroup) {
-				if (assignedUsers.contains(user.getDiscordId())) {
-					continue;
-				}
+		// Distribute players based on their roles and ranking
+		for (UserDTO user : usersReacted) {
+			List<String> userRoles = Arrays.asList(user.getMainRole(), user.getSecondaryRole());
+			int team1Score = calculateTeamScore(team1);
+			int team2Score = calculateTeamScore(team2);
 
-				if (isValidRoleForTeam(role, team1) && team1.size() < 5) {
-					team1.add(user);
-					assignedUsers.add(user.getDiscordId());
-				} else if (isValidRoleForTeam(role, team2) && team2.size() < 5) {
-					team2.add(user);
-					assignedUsers.add(user.getDiscordId());
+			boolean addedToTeam = false;
+			for (String role : userRoles) {
+				if (!addedToTeam) {
+					if (isValidRoleForTeam(role, team1)) {
+						if (team1Score <= team2Score) {
+							team1.add(user);
+							addedToTeam = true;
+						}
+					}
+					if (!addedToTeam && isValidRoleForTeam(role, team2)) {
+						if (team2Score <= team1Score) {
+							team2.add(user);
+							addedToTeam = true;
+						}
+					}
 				}
 			}
-		}
 
-		// If there are still unassigned players, fill the remaining slots using Elo rating
-		for (UserDTO user : usersReacted) {
-			if (!assignedUsers.contains(user.getDiscordId())) {
-				if (team1.size() <= team2.size()) {
+			if (!addedToTeam) {
+				// If user can't fit in their preferred roles, add to the team with the lowest
+				// score
+				if (team1Score <= team2Score) {
 					team1.add(user);
 				} else {
 					team2.add(user);
 				}
-				assignedUsers.add(user.getDiscordId());
 			}
 		}
-
-		// Adjust Elo balance
-		adjustEloBalance(team1, team2);
+		// Build Embed
 		int eloDifference = Math.abs(calculateTeamScore(team1) - calculateTeamScore(team2));
-
+		// Save teams to the database
 		matchService.saveTeamsWithMatchId(team1, team2, matchId);
 		return Pair.of(TeamBalancerEmbed.createEmbed(team1, team2, eloDifference, matchId), false);
 	}
 
-	private Map<String, List<UserDTO>> groupPlayersByRole(List<UserDTO> users) {
-		Map<String, List<UserDTO>> roleGroups = new HashMap<>();
+	// Create a custom game
+	// try {
+	// TournamentAPI tournamentCodeCreator = new TournamentAPI();
+	// String tournamentCode =
+	// tournamentCodeCreator.createTournamentCode(usersReacted);
+	// event.getChannel().sendMessage("Tournament code: " + tournamentCode).queue();
+	// } catch (IOException e) {
+	// e.printStackTrace();
+	// event.getChannel().sendMessage("Error creating the custom game.").queue();
+	// }
 
-		for (UserDTO user : users) {
-			String mainRole = user.getMainRole();
-			String secondaryRole = user.getSecondaryRole();
-
-			roleGroups.putIfAbsent(mainRole, new ArrayList<>());
-			roleGroups.get(mainRole).add(user);
-
-			roleGroups.putIfAbsent(secondaryRole, new ArrayList<>());
-			roleGroups.get(secondaryRole).add(user);
-		}
-
-		return roleGroups;
-	}
-
-	private void adjustEloBalance(List<UserDTO> team1, List<UserDTO> team2) {
-		int acceptableEloDifference = 250; // Set an acceptable Elo difference threshold
-		int eloDifference = Math.abs(calculateTeamScore(team1) - calculateTeamScore(team2));
-
-		if (eloDifference <= acceptableEloDifference) {
-			return;
-		}
-
-		// Swap players to minimize Elo disparity
-		for (UserDTO user1 : team1) {
-			for (UserDTO user2 : team2) {
-				List<UserDTO> newTeam1 = team1.stream().map(u -> u == user1 ? user2 : u).collect(Collectors.toList());
-				List<UserDTO> newTeam2 = team2.stream().map(u -> u == user2 ? user1 : u).collect(Collectors.toList());
-
-				int newEloDifference = Math.abs(calculateTeamScore(newTeam1) - calculateTeamScore(newTeam2));
-
-				if (newEloDifference < eloDifference) {
-					team1 = newTeam1;
-					team2 = newTeam2;
-					eloDifference = newEloDifference;
-				}
-			}
-		}
-	}
+	// Helper methods
 
 	private boolean isValidRoleForTeam(String role, List<UserDTO> team) {
 		return team.stream().noneMatch(u -> u.getMainRole().equals(role) || u.getSecondaryRole().equals(role));

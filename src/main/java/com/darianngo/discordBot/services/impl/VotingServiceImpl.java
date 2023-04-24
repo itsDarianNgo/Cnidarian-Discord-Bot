@@ -2,6 +2,7 @@ package com.darianngo.discordBot.services.impl;
 
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +48,7 @@ public class VotingServiceImpl implements VotingService {
 	@Override
 	public void startVoteCountdown(ButtonClickEvent event, String matchId) {
 		ScheduledFuture<?> scheduledTask = executorService.schedule(() -> {
-			if (usersFullyVoted.get(matchId) == null || usersFullyVoted.get(matchId).get() < 2) {
+			if (usersFullyVoted.get(matchId) == null || usersFullyVoted.get(matchId).get() < 7) {
 				// Send admin voting message if no majority vote or tie within 10 minutes
 				User admin = event.getJDA().retrieveUserById(event.getUser().getId()).complete();
 				sendAdminVoting(admin, matchId, matchResults.get(matchId));
@@ -62,23 +63,8 @@ public class VotingServiceImpl implements VotingService {
 		Map<Long, List<UserDTO>> teamMembers = matchService
 				.getTeamMembers(matchService.getMatchEntityById(Long.parseLong(matchId)).getTeams());
 
-		EmbedBuilder embedBuilder = new EmbedBuilder();
-		embedBuilder.setTitle("Vote has been rejected");
-		embedBuilder.setDescription("Choose the CORRECT winning team and score for match: " + matchId + "\n\n");
-		embedBuilder.setColor(Color.CYAN);
-
-		int teamNumber = 1;
-		for (Map.Entry<Long, List<UserDTO>> entry : teamMembers.entrySet()) {
-			StringBuilder teamDescription = new StringBuilder();
-			List<String> memberNames = new ArrayList<>();
-			for (UserDTO userDTO : entry.getValue()) {
-				memberNames.add("@" + userDTO.getDiscordName());
-			}
-			teamDescription.append(String.join(", ", memberNames));
-
-			embedBuilder.addField("Team " + teamNumber, teamDescription.toString(), true);
-			teamNumber++;
-		}
+		// Call buildAdminEmbed to build the embed
+		MessageEmbed embed = buildAdminEmbed(matchId, teamMembers);
 
 		List<Component> components = new ArrayList<>();
 		components.add(Button.primary("admin_vote_team1_" + matchId, "Team 1"));
@@ -88,9 +74,6 @@ public class VotingServiceImpl implements VotingService {
 
 		String approvalChannelId = discordChannelConfig.getApprovalChannelId();
 		TextChannel approvalChannel = admin.getJDA().getTextChannelById(approvalChannelId);
-
-		// Build the embed from the embedBuilder
-		MessageEmbed embed = embedBuilder.build();
 
 		if (approvalChannel != null) {
 			approvalChannel.sendMessageEmbeds(embed).setActionRow(components).queue();
@@ -118,7 +101,7 @@ public class VotingServiceImpl implements VotingService {
 				// Schedule a task to disable the buttons after 10 minutes
 				executorService.schedule(() -> {
 					disableButtons(message);
-				}, 10, TimeUnit.MINUTES);
+				}, 5, TimeUnit.MINUTES);
 			});
 		});
 	}
@@ -130,12 +113,42 @@ public class VotingServiceImpl implements VotingService {
 		embedBuilder.setDescription("Please select the winning team and score for match: " + matchId + "\n\n");
 		embedBuilder.setColor(Color.CYAN);
 
+		// Convert the entrySet into a List and sort it based on the team ID
+		List<Map.Entry<Long, List<UserDTO>>> sortedTeams = new ArrayList<>(teamMembers.entrySet());
+		sortedTeams.sort(Comparator.comparing(Map.Entry::getKey));
+
 		int teamNumber = 1;
-		for (Map.Entry<Long, List<UserDTO>> entry : teamMembers.entrySet()) {
+		for (Map.Entry<Long, List<UserDTO>> entry : sortedTeams) {
 			StringBuilder teamDescription = new StringBuilder();
 			List<String> memberNames = new ArrayList<>();
 			for (UserDTO userDTO : entry.getValue()) {
-				memberNames.add("@" + userDTO.getDiscordName());
+				memberNames.add(userDTO.getDiscordName());
+			}
+			teamDescription.append(String.join(", ", memberNames));
+
+			embedBuilder.addField("Team " + teamNumber, teamDescription.toString(), true);
+			teamNumber++;
+		}
+
+		return embedBuilder.build();
+	}
+
+	private MessageEmbed buildAdminEmbed(String matchId, Map<Long, List<UserDTO>> teamMembers) {
+		EmbedBuilder embedBuilder = new EmbedBuilder();
+		embedBuilder.setTitle("Vote has been rejected");
+		embedBuilder.setDescription("Choose the CORRECT winning team and score for match: " + matchId + "\n\n");
+		embedBuilder.setColor(Color.CYAN);
+
+		// Convert the entrySet into a List and sort it based on the team ID
+		List<Map.Entry<Long, List<UserDTO>>> sortedTeams = new ArrayList<>(teamMembers.entrySet());
+		sortedTeams.sort(Comparator.comparing(Map.Entry::getKey));
+
+		int teamNumber = 1;
+		for (Map.Entry<Long, List<UserDTO>> entry : sortedTeams) {
+			StringBuilder teamDescription = new StringBuilder();
+			List<String> memberNames = new ArrayList<>();
+			for (UserDTO userDTO : entry.getValue()) {
+				memberNames.add(userDTO.getDiscordName());
 			}
 			teamDescription.append(String.join(", ", memberNames));
 
