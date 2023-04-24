@@ -22,7 +22,7 @@ public class EloServiceImpl implements EloService {
 	private static final double BETA = 200;
 	private static final Double INITIAL_ELO = Double.valueOf(1200);
 	private static final Double INITIAL_SIGMA = Double.valueOf(800);
-	private static final Double SIGMA_DECAY_RATE = 0.99;
+	private static final Double SIGMA_DECAY_RATE = 0.9;
 
 	private final UserRepository userRepository;
 	private final UserMapper userMapper;
