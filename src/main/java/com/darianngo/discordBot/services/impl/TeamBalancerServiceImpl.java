@@ -1,7 +1,6 @@
 package com.darianngo.discordBot.services.impl;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -54,25 +53,46 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 
 		// Distribute players based on their roles and ranking
 		for (UserDTO user : usersReacted) {
-			List<String> userRoles = Arrays.asList(user.getMainRole(), user.getSecondaryRole());
+			String mainRole = user.getMainRole();
+			String secondaryRole = user.getSecondaryRole();
 			int team1Score = calculateTeamScore(team1);
 			int team2Score = calculateTeamScore(team2);
 
 			boolean addedToTeam = false;
-			for (String role : userRoles) {
-				if (!addedToTeam) {
-					if (isValidRoleForTeam(role, team1)) {
-						if (team1Score <= team2Score) {
-							team1.add(user);
-							addedToTeam = true;
-						}
+
+			// Check mainRole
+			if (isValidRoleForTeam(mainRole, team1) && isValidRoleForTeam(mainRole, team2)) {
+				if (team1Score <= team2Score) {
+					team1.add(user);
+					addedToTeam = true;
+				} else {
+					team2.add(user);
+					addedToTeam = true;
+				}
+			} else if (isValidRoleForTeam(mainRole, team1)) {
+				team1.add(user);
+				addedToTeam = true;
+			} else if (isValidRoleForTeam(mainRole, team2)) {
+				team2.add(user);
+				addedToTeam = true;
+			}
+
+			// Check secondaryRole only if not added based on mainRole
+			if (!addedToTeam) {
+				if (isValidRoleForTeam(secondaryRole, team1) && isValidRoleForTeam(secondaryRole, team2)) {
+					if (team1Score <= team2Score) {
+						team1.add(user);
+						addedToTeam = true;
+					} else {
+						team2.add(user);
+						addedToTeam = true;
 					}
-					if (!addedToTeam && isValidRoleForTeam(role, team2)) {
-						if (team2Score <= team1Score) {
-							team2.add(user);
-							addedToTeam = true;
-						}
-					}
+				} else if (isValidRoleForTeam(secondaryRole, team1)) {
+					team1.add(user);
+					addedToTeam = true;
+				} else if (isValidRoleForTeam(secondaryRole, team2)) {
+					team2.add(user);
+					addedToTeam = true;
 				}
 			}
 
