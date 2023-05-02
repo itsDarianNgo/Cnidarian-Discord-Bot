@@ -26,6 +26,7 @@ public class EloServiceImpl implements EloService {
 	private static final Double PROGRESSIVE_SCALING_THRESHOLD_1 = 50.0;
 	private static final Double PROGRESSIVE_SCALING_THRESHOLD_2 = 200.0;
 	private static final Double PROGRESSIVE_SCALING_LOWER_BOUND = 0.5;
+	private static final Double WIN_STREAK_BONUS_MULTIPLIER = 1.1;
 
 	private final UserRepository userRepository;
 	private final UserMapper userMapper;
@@ -74,7 +75,6 @@ public class EloServiceImpl implements EloService {
 
 		double winProb = winProbability(userTeam, opposingTeam);
 		double totalEloChange = K_FACTOR * matchWeight * (actualOutcome - winProb);
-
 		// Introduce scaling factor based on user's sigma
 		double sigmaScalingFactor = user.getSigma() / INITIAL_SIGMA;
 
@@ -123,6 +123,17 @@ public class EloServiceImpl implements EloService {
 
 	private void updateEloForUser(UserDTO user, double eloChange, boolean isWinner) {
 		int roundedEloChange = (int) Math.ceil(eloChange);
+
+		// Update winning streak and apply the bonus if necessary
+		if (isWinner) {
+			user.setWinningStreak((user.getWinningStreak() == null ? 0 : user.getWinningStreak()) + 1);
+			if (user.getWinningStreak() >= 2) {
+				roundedEloChange *= Math.pow(WIN_STREAK_BONUS_MULTIPLIER, user.getWinningStreak() - 1);
+			}
+		} else {
+			user.setWinningStreak(0);
+		}
+
 		user.setElo(user.getElo() + roundedEloChange);
 		user.setRecentEloChange((double) roundedEloChange);
 

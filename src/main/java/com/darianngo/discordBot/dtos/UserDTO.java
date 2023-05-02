@@ -23,5 +23,6 @@ public class UserDTO {
 	private Integer totalMatches;
 	private Integer wins;
 	private Integer losses;
+	private Integer winningStreak;
 	private List<UserTeamDTO> userTeams;
 }

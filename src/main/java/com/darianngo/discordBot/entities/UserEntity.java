@@ -30,6 +30,7 @@ public class UserEntity {
 	private Integer totalMatches;
 	private Integer wins;
 	private Integer losses;
+	private Integer winningStreak;
 	@OneToMany(mappedBy = "user")
 	private List<UserTeamEntity> userTeams;
 }
