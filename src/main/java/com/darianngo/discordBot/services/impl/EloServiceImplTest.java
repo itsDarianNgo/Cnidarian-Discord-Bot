@@ -51,7 +51,7 @@ public class EloServiceImplTest {
 
 		UserDTO user1 = createUser("1", "User1", 1200.0, 800.0, user1TeamIds);
 		UserDTO user2 = createUser("2", "User2", 1250.0, 300.0, user2TeamIds);
-		UserDTO user3 = createUser("3", "User3", 900.0, 800.0, user3TeamIds);
+		UserDTO user3 = createUser("3", "User3", 900.0, 200.0, user3TeamIds);
 		UserDTO user4 = createUser("4", "User4", 1150.0, 800.0, user4TeamIds);
 		UserDTO user5 = createUser("5", "User5", 1300.0, 800.0, user5TeamIds);
 		UserDTO user6 = createUser("6", "User6", 1350.0, 800.0, user6TeamIds);

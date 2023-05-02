@@ -22,7 +22,10 @@ public class EloServiceImpl implements EloService {
 	private static final double BETA = 200;
 	private static final Double INITIAL_ELO = Double.valueOf(1200);
 	private static final Double INITIAL_SIGMA = Double.valueOf(800);
-	private static final Double SIGMA_DECAY_RATE = 0.9;
+	private static final Double SIGMA_DECAY_RATE = 0.99;
+	private static final Double PROGRESSIVE_SCALING_THRESHOLD_1 = 50.0;
+	private static final Double PROGRESSIVE_SCALING_THRESHOLD_2 = 200.0;
+	private static final Double PROGRESSIVE_SCALING_LOWER_BOUND = 0.5;
 
 	private final UserRepository userRepository;
 	private final UserMapper userMapper;
@@ -80,6 +83,9 @@ public class EloServiceImpl implements EloService {
 		double eloScalingExponent = 1.2; // You can adjust this value to change the scaling effect
 		double eloScalingFactor = 1.0;
 
+		// Introduce progressive scaling factor based on total matches played
+		double progressiveScalingFactor = calculateProgressiveScalingFactor(user.getTotalMatches());
+
 		if (isWinner) {
 			eloScalingFactor = Math.pow(avgEloOtherTeam / user.getElo(), eloScalingExponent);
 		} else {
@@ -87,7 +93,18 @@ public class EloServiceImpl implements EloService {
 		}
 
 		// Calculate final ELO change considering scaling factors and team size
-		return (totalEloChange * sigmaScalingFactor * eloScalingFactor) / userTeam.size();
+		return (totalEloChange * sigmaScalingFactor * eloScalingFactor * progressiveScalingFactor) / userTeam.size();
+	}
+
+	private double calculateProgressiveScalingFactor(Integer totalMatches) {
+		if (totalMatches <= PROGRESSIVE_SCALING_THRESHOLD_1) {
+			return 1.0;
+		} else if (totalMatches <= PROGRESSIVE_SCALING_THRESHOLD_2) {
+			double slope = (0.7 - 1.0) / (PROGRESSIVE_SCALING_THRESHOLD_2 - PROGRESSIVE_SCALING_THRESHOLD_1);
+			return 1.0 + slope * (totalMatches - PROGRESSIVE_SCALING_THRESHOLD_1);
+		} else {
+			return PROGRESSIVE_SCALING_LOWER_BOUND;
+		}
 	}
 
 	public double winProbability(List<UserDTO> team1, List<UserDTO> team2) {
