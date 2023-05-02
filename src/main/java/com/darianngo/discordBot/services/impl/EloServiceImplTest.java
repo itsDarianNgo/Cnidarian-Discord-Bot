@@ -49,16 +49,16 @@ public class EloServiceImplTest {
 		List<Long> user9TeamIds = Arrays.asList(1L, 3L, 5L, 7L, 9L);
 		List<Long> user10TeamIds = Arrays.asList(2L, 4L, 6L, 8L, 10L);
 
-		UserDTO user1 = createUser("1", "User1", 1200.0, 800.0, user1TeamIds);
-		UserDTO user2 = createUser("2", "User2", 1250.0, 300.0, user2TeamIds);
-		UserDTO user3 = createUser("3", "User3", 900.0, 200.0, user3TeamIds);
-		UserDTO user4 = createUser("4", "User4", 1150.0, 800.0, user4TeamIds);
-		UserDTO user5 = createUser("5", "User5", 1300.0, 800.0, user5TeamIds);
-		UserDTO user6 = createUser("6", "User6", 1350.0, 800.0, user6TeamIds);
-		UserDTO user7 = createUser("7", "User7", 1400.0, 800.0, user7TeamIds);
-		UserDTO user8 = createUser("8", "User8", 1450.0, 800.0, user8TeamIds);
-		UserDTO user9 = createUser("9", "User9", 1500.0, 800.0, user9TeamIds);
-		UserDTO user10 = createUser("10", "User10", 1800.0, 800.0, user10TeamIds);
+		UserDTO user1 = createUser("1", "User1", 1200.0, 1600.0, user1TeamIds);
+		UserDTO user2 = createUser("2", "User2", 1250.0, 1600.0, user2TeamIds);
+		UserDTO user3 = createUser("3", "User3", 900.0, 1600.0, user3TeamIds);
+		UserDTO user4 = createUser("4", "User4", 1150.0, 1600.0, user4TeamIds);
+		UserDTO user5 = createUser("5", "User5", 1300.0, 1600.0, user5TeamIds);
+		UserDTO user6 = createUser("6", "User6", 1350.0, 1600.0, user6TeamIds);
+		UserDTO user7 = createUser("7", "User7", 1400.0, 1600.0, user7TeamIds);
+		UserDTO user8 = createUser("8", "User8", 1450.0, 1600.0, user8TeamIds);
+		UserDTO user9 = createUser("9", "User9", 1500.0, 1600.0, user9TeamIds);
+		UserDTO user10 = createUser("10", "User10", 1800.0, 1600.0, user10TeamIds);
 
 		List<UserDTO> usersInMatch = Arrays.asList(user1, user2, user3, user4, user5, user6, user7, user8, user9,
 				user10);

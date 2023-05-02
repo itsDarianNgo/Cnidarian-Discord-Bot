@@ -21,8 +21,8 @@ public class EloServiceImpl implements EloService {
 	private static final double K_FACTOR = 350;
 	private static final double BETA = 200;
 	private static final Double INITIAL_ELO = Double.valueOf(1200);
-	private static final Double INITIAL_SIGMA = Double.valueOf(800);
-	private static final Double SIGMA_DECAY_RATE = 0.99;
+	private static final Double INITIAL_SIGMA = Double.valueOf(1600);
+	private static final Double SIGMA_DECAY_RATE = 0.9999;
 	private static final Double PROGRESSIVE_SCALING_THRESHOLD_1 = 50.0;
 	private static final Double PROGRESSIVE_SCALING_THRESHOLD_2 = 200.0;
 	private static final Double PROGRESSIVE_SCALING_LOWER_BOUND = 0.5;
