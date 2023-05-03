@@ -62,12 +62,20 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 
 			// Check mainRole
 			if (isValidRoleForTeam(mainRole, team1) && isValidRoleForTeam(mainRole, team2)) {
-				if (team1Score <= team2Score) {
+				if (team1.size() < team2.size()) {
 					team1.add(user);
 					addedToTeam = true;
-				} else {
+				} else if (team2.size() < team1.size()) {
 					team2.add(user);
 					addedToTeam = true;
+				} else {
+					if (team1Score <= team2Score) {
+						team1.add(user);
+						addedToTeam = true;
+					} else {
+						team2.add(user);
+						addedToTeam = true;
+					}
 				}
 			} else if (isValidRoleForTeam(mainRole, team1)) {
 				team1.add(user);
@@ -80,12 +88,20 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 			// Check secondaryRole only if not added based on mainRole
 			if (!addedToTeam) {
 				if (isValidRoleForTeam(secondaryRole, team1) && isValidRoleForTeam(secondaryRole, team2)) {
-					if (team1Score <= team2Score) {
+					if (team1.size() < team2.size()) {
 						team1.add(user);
 						addedToTeam = true;
-					} else {
+					} else if (team2.size() < team1.size()) {
 						team2.add(user);
 						addedToTeam = true;
+					} else {
+						if (team1Score <= team2Score) {
+							team1.add(user);
+							addedToTeam = true;
+						} else {
+							team2.add(user);
+							addedToTeam = true;
+						}
 					}
 				} else if (isValidRoleForTeam(secondaryRole, team1)) {
 					team1.add(user);
@@ -98,11 +114,17 @@ public class TeamBalancerServiceImpl implements TeamBalancerService {
 
 			if (!addedToTeam) {
 				// If user can't fit in their preferred roles, add to the team with the lowest
-				// score
-				if (team1Score <= team2Score) {
+				// score and least players
+				if (team1.size() < team2.size()) {
 					team1.add(user);
-				} else {
+				} else if (team2.size() < team1.size()) {
 					team2.add(user);
+				} else {
+					if (team1Score <= team2Score) {
+						team1.add(user);
+					} else {
+						team2.add(user);
+					}
 				}
 			}
 		}
