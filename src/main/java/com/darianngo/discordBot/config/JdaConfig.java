@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
 
 import com.darianngo.discordBot.commands.CreateCustomGameCommand;
+import com.darianngo.discordBot.commands.LeaderboardCommand;
 import com.darianngo.discordBot.commands.SetupLoLProfileCommand;
 import com.darianngo.discordBot.commands.ShowLoLProfileCommand;
 import com.darianngo.discordBot.listeners.ButtonClickListener;
@@ -26,8 +27,8 @@ public class JdaConfig {
 
 	@Bean
 	public JDA jda(@Autowired MessageReactionListener messageReactionListener,
-	               @Autowired SlashCommandListener slashCommandListener,
-	               @Autowired ButtonClickListener buttonClickListener) throws LoginException, InterruptedException {
+			@Autowired SlashCommandListener slashCommandListener, @Autowired ButtonClickListener buttonClickListener)
+			throws LoginException, InterruptedException {
 		JDA jda = JDABuilder.createDefault(token)
 				.addEventListeners(messageReactionListener, slashCommandListener, buttonClickListener).build()
 				.awaitReady();
@@ -41,5 +42,7 @@ public class JdaConfig {
 		jda.upsertCommand(SetupLoLProfileCommand.COMMAND_DATA).queue();
 		jda.upsertCommand(ShowLoLProfileCommand.COMMAND_DATA).queue();
 		jda.upsertCommand(CreateCustomGameCommand.COMMAND_DATA).queue();
+		jda.upsertCommand(LeaderboardCommand.COMMAND_DATA).queue();
+
 	}
 }

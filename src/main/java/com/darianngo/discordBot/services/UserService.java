@@ -1,5 +1,7 @@
 package com.darianngo.discordBot.services;
 
+import java.util.List;
+
 import com.darianngo.discordBot.dtos.UserDTO;
 
 public interface UserService {
@@ -12,4 +14,7 @@ public interface UserService {
 	UserDTO setRoles(String discordId, String mainRole, String secondaryRole, String discordName, String summonerName);
 
 	UserDTO updateUser(UserDTO userDTO);
+
+	List<UserDTO> getLeaderboard();
+
 }

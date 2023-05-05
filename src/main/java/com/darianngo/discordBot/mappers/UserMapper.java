@@ -1,5 +1,7 @@
 package com.darianngo.discordBot.mappers;
 
+import java.util.List;
+
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.factory.Mappers;
@@ -22,4 +24,7 @@ public interface UserMapper {
 	@Mapping(source = "id", target = "discordId")
 	@Mapping(source = "name", target = "discordName")
 	UserDTO jdaUserToDto(User jdaUser);
+
+	List<UserDTO> toDtoList(List<UserEntity> entities);
+
 }

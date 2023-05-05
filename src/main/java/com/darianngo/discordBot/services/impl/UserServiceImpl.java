@@ -1,5 +1,7 @@
 package com.darianngo.discordBot.services.impl;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 
 import com.darianngo.discordBot.dtos.UserDTO;
@@ -71,6 +73,12 @@ public class UserServiceImpl implements UserService {
 		UserEntity userEntity = userMapper.toEntity(userDTO);
 		UserEntity updatedUser = userRepository.save(userEntity);
 		return userMapper.toDto(updatedUser);
+	}
+
+	@Override
+	public List<UserDTO> getLeaderboard() {
+		List<UserEntity> userEntities = userRepository.findAllByOrderByEloDesc();
+		return userMapper.toDtoList(userEntities);
 	}
 
 }

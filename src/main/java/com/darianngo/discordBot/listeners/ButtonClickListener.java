@@ -25,6 +25,7 @@ import com.darianngo.discordBot.dtos.TeamDTO;
 import com.darianngo.discordBot.dtos.UserDTO;
 import com.darianngo.discordBot.dtos.UserVoteDTO;
 import com.darianngo.discordBot.embeds.FinalResultEmbed;
+import com.darianngo.discordBot.embeds.LeaderboardEmbed;
 import com.darianngo.discordBot.mappers.UserMapper;
 import com.darianngo.discordBot.repositories.UserRepository;
 import com.darianngo.discordBot.services.EloService;
@@ -54,10 +55,11 @@ public class ButtonClickListener extends ListenerAdapter {
 	private final MatchResultService matchResultService;
 	private final UserMapper userMapper;
 	private final UserRepository userRepository;
+	private final LeaderboardEmbed leaderboardEmbed;
 
 	public ButtonClickListener(MatchService matchService, VotingService votingService, UserService userService,
 			EloService eloService, MatchResultService matchResultService, UserMapper userMapper,
-			UserRepository userRepository) {
+			UserRepository userRepository, LeaderboardEmbed leaderboardEmbed) {
 		this.matchService = matchService;
 		this.votingService = votingService;
 		this.userService = userService;
@@ -65,6 +67,7 @@ public class ButtonClickListener extends ListenerAdapter {
 		this.matchResultService = matchResultService;
 		this.userMapper = userMapper;
 		this.userRepository = userRepository;
+		this.leaderboardEmbed = leaderboardEmbed;
 	}
 
 	@Autowired
@@ -95,8 +98,43 @@ public class ButtonClickListener extends ListenerAdapter {
 			handleAdminVoteButtonClick(event, buttonIdParts);
 		} else if ("cancel".equals(action)) {
 			handleCancelButtonClick(event);
+		} else if (event.getComponentId().startsWith("prev_page") || event.getComponentId().startsWith("next_page")) {
+			handleLeaderboardPagination(event);
 		}
+
 		event.deferEdit().queue(); // Acknowledge the event
+	}
+
+	private void handleLeaderboardPagination(ButtonClickEvent event) {
+		List<UserDTO> leaderboard = userService.getLeaderboard();
+		int totalPages = (int) Math.ceil((double) leaderboard.size() / 10);
+
+		int currentPage = 0; // Initialize with a default value
+		String[] componentIdParts = event.getComponentId().split(":");
+
+		if (componentIdParts.length > 1) {
+			currentPage = Integer.parseInt(componentIdParts[1]);
+		} else {
+			// Log an error or handle the issue in some other way
+		}
+
+		if (event.getComponentId().startsWith("prev_page")) {
+			currentPage--;
+		} else if (event.getComponentId().startsWith("next_page")) {
+			currentPage++;
+		}
+
+		MessageEmbed updatedEmbed = leaderboardEmbed.generateLeaderboardEmbed(leaderboard, currentPage);
+		Button updatedPrevButton = currentPage == 0
+				? Button.primary("prev_page:" + currentPage, "Previous").asDisabled()
+				: Button.primary("prev_page:" + currentPage, "Previous");
+		Button updatedNextButton = currentPage == totalPages - 1
+				? Button.primary("next_page:" + currentPage, "Next").asDisabled()
+				: Button.primary("next_page:" + currentPage, "Next");
+		ActionRow updatedActionRow = ActionRow.of(updatedPrevButton, updatedNextButton);
+
+		event.getHook().editOriginalEmbeds(updatedEmbed).setActionRows(updatedActionRow).queue();
+
 	}
 
 	private void handleCancelButtonClick(ButtonClickEvent event) {
@@ -118,8 +156,8 @@ public class ButtonClickListener extends ListenerAdapter {
 		// Retrieve the user's name and send a message with their name
 		event.getJDA().retrieveUserById(discordId).queue(user -> {
 			String userName = user.getName();
-			event.getChannel().sendMessage("Match " + matchId + " has been cancelled by " +"<@" + discordId
-					+ ">.").queue();
+			event.getChannel().sendMessage("Match " + matchId + " has been cancelled by " + "<@" + discordId + ">.")
+					.queue();
 		});
 	}
 

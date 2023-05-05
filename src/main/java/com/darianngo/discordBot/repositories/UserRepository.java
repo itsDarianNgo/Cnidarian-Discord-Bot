@@ -1,5 +1,6 @@
 package com.darianngo.discordBot.repositories;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -17,4 +18,7 @@ public interface UserRepository extends JpaRepository<UserEntity, String> {
 
 	@Query("SELECT u FROM UserEntity u LEFT JOIN FETCH u.userTeams WHERE u.id = :id")
 	Optional<UserEntity> findByIdWithUserTeams(@Param("id") String id);
+
+	List<UserEntity> findAllByOrderByEloDesc();
+
 }
